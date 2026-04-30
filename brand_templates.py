@@ -178,8 +178,7 @@ class ShireEliteTemplate:
   <div class="email-wrapper">
     <div class="email-container">
       <div class="header">
-        <p style="font-size: 24px; font-weight: 900; color: #1a1a1a; margin: 0 0 8px; letter-spacing: -2px;">SHIRE ELITE</p>
-        <p style="font-size: 14px; font-weight: 400; color: #888888; margin: 0; letter-spacing: 2px;">CHEERLEADING</p>
+        <img src="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo.jpg" alt="Shire Elite" style="max-width: 200px; height: auto; display: block; margin: 0 auto;" />
       </div>
       <div class="content">
         <h1>{event_title}</h1>
