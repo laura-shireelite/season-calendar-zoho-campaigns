@@ -22,6 +22,7 @@ class EmailTemplates:
             'catch ups': EmailTemplates._template_catch_ups(),
             'fees': EmailTemplates._template_fees(),
             'cheer clinics': EmailTemplates._template_cheer_clinics(),
+            'holiday clinics': EmailTemplates._template_holiday_clinics(),
             'important dates': EmailTemplates._template_important_dates(),
             'other': EmailTemplates._template_other()
         }
@@ -59,11 +60,12 @@ class EmailTemplates:
     def _template_gym_closures() -> Dict:
         """Template for facility closures."""
         return {
-            'subject': lambda name, date: f"🔒 {name}",
+            'subject': lambda name, date: f"🔒 Gym Closure Notice – {date}",
             'body': lambda name, date, event: f"""<html><body>
-<h2>{name}</h2>
-<p><strong>Date:</strong> {date}</p>
-<p>Please note: Our facility will be closed during this time. Classes will resume after this period.</p>
+<h2>⏸️ We're Closed {date}</h2>
+<p>Our facility will be closed during this period for maintenance and staff break.</p>
+<p><strong>We'll be back and ready for you!</strong></p>
+<p>If you have any urgent questions, please don't hesitate to contact us.</p>
 <p>Best,<br>Your Gym Team</p>
 </body></html>""",
             'cta_text': 'Contact Us'
@@ -109,6 +111,28 @@ class EmailTemplates:
 <p>Best,<br>Your Gym Team</p>
 </body></html>""",
             'cta_text': 'Sign Up'
+        }
+
+    @staticmethod
+    def _template_holiday_clinics() -> Dict:
+        """Template for grouped holiday clinic sessions (e.g., all Winter Holiday Clinics together)."""
+        return {
+            'subject': lambda name, date: f"🎀 {name}",
+            'body': lambda name, date, event: f"""<html><body>
+<h2>✨ Holiday Clinics Coming Up!</h2>
+<p><strong>{name}</strong></p>
+<p><strong>Dates:</strong> {date}</p>
+<p>Don't let the holidays be boring! Join us for exciting clinic sessions where members can improve their skills, make new friends, and have a blast.</p>
+<p><strong>What to expect:</strong></p>
+<ul>
+<li>Fun, high-energy sessions</li>
+<li>Learn new techniques</li>
+<li>Perfect for all levels</li>
+</ul>
+<p>Spots fill up fast during holidays—secure your place today!</p>
+<p>Best,<br>Your Gym Team</p>
+</body></html>""",
+            'cta_text': 'Register Now'
         }
 
     @staticmethod

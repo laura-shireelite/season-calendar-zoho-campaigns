@@ -128,7 +128,7 @@ class CampaignGenerator:
 
     def create_term_start_campaign(self) -> Dict:
         """
-        Create the term-start campaign listing all events.
+        Create the term-start campaign listing all events (excluding holiday clinics).
 
         Returns:
             Campaign dict ready for Zoho API with content_url pointing to hosted HTML
@@ -136,19 +136,39 @@ class CampaignGenerator:
         if not self.events:
             return {}
 
-        campaign_name = f"{self.term_name} - All Events"
+        campaign_name = f"{self.term_name} - What's Coming Up"
 
-        # Build the event list for the email body (simplified to stay under length limit)
-        events_list = "<br>".join([f"• {event.get('Event Name', '')}" for event in self.events[:5]])
+        # Exclude holiday clinic events from the overview
+        # (they get their own grouped campaign)
+        non_clinic_events = [
+            e for e in self.events
+            if not self._is_holiday_clinic(e.get('Event Name', ''))
+        ]
+
+        # Build the event list for the email body
+        if non_clinic_events:
+            events_list = "\n".join([f"• {event.get('Event Name', '')}" for event in non_clinic_events])
+        else:
+            events_list = "Check back soon for event details!"
+
+        # Get term dates
+        term_start = self.events[0].get('Date', 'TBA') if self.events else 'TBA'
+        term_end = "TBA"
+        for event in self.events:
+            if 'end' in event.get('Event Name', '').lower() and 'terms' in event.get('Event Type', '').lower():
+                term_end = event.get('Date', 'TBA')
 
         # Build email body
-        subject = f"📅 {self.term_name} – Your Event Calendar"
+        subject = f"📅 {self.term_name} – What's Coming Up"
 
-        body = f"""<html><body><h2>{self.term_name}</h2>
-<p>Upcoming events this term:</p>
-<p>{events_list}</p>
-<p>You'll receive reminders 3 days before each event.</p>
-<p>Thanks!<br>Your Gym Team</p></body></html>"""
+        body = f"""<html><body>
+<h2>📅 {self.term_name}</h2>
+<p><strong>Term Runs:</strong> {term_start} to {term_end}</p>
+<p><strong>Upcoming events:</strong></p>
+<p>{events_list.replace(chr(10), '<br>')}</p>
+<p>You'll receive reminders 3 days before each event. Holiday clinics will be announced separately!</p>
+<p>Thanks!<br>Your Gym Team</p>
+</body></html>"""
 
         # Save HTML and get public URL
         safe_term_name = sanitize_filename(self.term_name.lower().replace(' ', '-'))
@@ -158,27 +178,49 @@ class CampaignGenerator:
         return {
             'name': campaign_name,
             'subject': subject,
-            'content_url': content_url,  # Now using public URL instead of body
+            'content_url': content_url,
             'from_name': self._get_gym_from_name(),
             'type': 'term_overview',
-            'target_gym': 'Shire Elite'  # Default to SE for term overview
+            'target_gym': 'Shire Elite'
         }
 
     def create_reminder_campaigns(self) -> List[Dict]:
         """
         Create reminder campaigns for 3 days before each event.
 
+        Handles:
+        - Regular events (individual reminders)
+        - Gym closures (individual reminders)
+        - Holiday clinics (grouped by holiday period)
+
         Returns:
             List of campaign dicts ready for Zoho API
         """
         campaigns = []
+        processed_events = set()  # Track which events we've processed
+        holiday_clinic_groups = {}  # Group clinics by holiday period
 
         print(f"    📊 Processing {len(self.events)} events for reminders...")
 
+        # First pass: group holiday clinics by holiday period
+        for event in self.events:
+            event_name = event.get('Event Name', '')
+            if self._is_holiday_clinic(event_name):
+                holiday_period = self._extract_holiday_period(event_name)
+                if holiday_period not in holiday_clinic_groups:
+                    holiday_clinic_groups[holiday_period] = []
+                holiday_clinic_groups[holiday_period].append(event)
+
+        # Second pass: create campaigns
         for idx, event in enumerate(self.events):
             event_name = event.get('Event Name', '')
             event_type = event.get('Event Type', '').strip().lower()
             event_date_str = event.get('Date', '')
+            event_id = f"{event_name}_{event_date_str}"  # Unique identifier
+
+            # Skip if already processed (as part of a group)
+            if event_id in processed_events:
+                continue
 
             # Skip term events (they don't get reminders)
             if 'terms' in event_type:
@@ -194,14 +236,47 @@ class CampaignGenerator:
             # Calculate reminder date (3 days before)
             reminder_date = event_date - timedelta(days=3)
 
-            # Build campaign
-            campaign = self._build_reminder_campaign(event, reminder_date)
-            if campaign:
-                campaigns.append(campaign)
-                print(f"    ✅ Event {idx+1}: '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+            # Handle holiday clinics as a group
+            if self._is_holiday_clinic(event_name):
+                holiday_period = self._extract_holiday_period(event_name)
+                if holiday_period in holiday_clinic_groups:
+                    # Create one campaign for all clinics in this period
+                    campaign = self._build_holiday_clinic_campaign(
+                        holiday_period,
+                        holiday_clinic_groups[holiday_period],
+                        reminder_date
+                    )
+                    if campaign:
+                        campaigns.append(campaign)
+                        for clinic_event in holiday_clinic_groups[holiday_period]:
+                            processed_events.add(f"{clinic_event.get('Event Name', '')}{clinic_event.get('Date', '')}")
+                        print(f"    ✅ Grouped: '{holiday_period}' clinics → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+                    # Remove from dict so we don't process it again
+                    del holiday_clinic_groups[holiday_period]
+            else:
+                # Regular event or gym closure
+                campaign = self._build_reminder_campaign(event, reminder_date)
+                if campaign:
+                    campaigns.append(campaign)
+                    processed_events.add(event_id)
+                    print(f"    ✅ Event {idx+1}: '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
 
         print(f"    📋 Created {len(campaigns)} reminder campaigns from {len(self.events)} events")
         return campaigns
+
+    def _is_holiday_clinic(self, event_name: str) -> bool:
+        """Check if an event is a holiday clinic (e.g., 'Cheer Clinics – Winter Hols Wk 2')."""
+        lower_name = event_name.lower()
+        return 'cheer clinics' in lower_name and ('hols' in lower_name or 'holidays' in lower_name)
+
+    def _extract_holiday_period(self, event_name: str) -> str:
+        """Extract the holiday period name from an event (e.g., 'Winter Hols' from 'Cheer Clinics – Winter Hols Wk 2')."""
+        # Find the holiday period between dashes
+        import re
+        match = re.search(r'–\s*(.+?)\s+Wk', event_name)
+        if match:
+            return match.group(1).strip()
+        return event_name
 
     def _build_reminder_campaign(self, event: Dict, reminder_date: datetime) -> Dict:
         """Build a single reminder campaign."""
@@ -229,12 +304,47 @@ class CampaignGenerator:
         return {
             'name': campaign_name,
             'subject': subject,
-            'content_url': content_url,  # Now using public URL instead of body
+            'content_url': content_url,
             'from_name': self._get_gym_from_name(),
             'type': 'reminder',
             'event_name': event_name,
             'reminder_date': reminder_date.strftime('%Y-%m-%d'),
             'target_gym': gym
+        }
+
+    def _build_holiday_clinic_campaign(self, holiday_period: str, clinic_events: List[Dict], reminder_date: datetime) -> Dict:
+        """Build a campaign for grouped holiday clinics (e.g., all Winter Hols clinics together)."""
+        # Combine dates from all clinic events
+        clinic_dates = [e.get('Date', '') for e in clinic_events]
+        combined_dates = " / ".join(clinic_dates)
+
+        campaign_name = f"Cheer Clinics – {holiday_period}"
+
+        # Use holiday clinics template
+        rendered = EmailTemplates.render_template(
+            'holiday clinics',
+            campaign_name,
+            combined_dates,
+            {'events': clinic_events}
+        )
+
+        subject = rendered['subject']
+        body = rendered['body']
+
+        # Save HTML and get public URL
+        safe_period = sanitize_filename(holiday_period.lower().replace(' ', '-'))
+        filename = f"reminder-holiday-clinics-{safe_period}-{reminder_date.strftime('%Y%m%d')}.html"
+        content_url = self._save_html_and_get_url(body, filename)
+
+        return {
+            'name': f"{campaign_name} - 3 Day Reminder",
+            'subject': subject,
+            'content_url': content_url,
+            'from_name': self._get_gym_from_name(),
+            'type': 'reminder',
+            'event_name': campaign_name,
+            'reminder_date': reminder_date.strftime('%Y-%m-%d'),
+            'target_gym': 'All'
         }
 
     @staticmethod
