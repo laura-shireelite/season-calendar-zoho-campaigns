@@ -175,7 +175,8 @@ class CampaignGenerator:
             event_title=f"📅 {self.term_name}",
             main_content=main_content,
             button_text="Athletes Page",
-            button_url="https://www.shireelite.com.au/athletes"
+            button_url="https://www.shireelite.com.au/athletes",
+            logo_url="https://campaigns.zoho.com.au/campaigns/org7001313022/imagebannerAction.do?imgName=Campaigns_email_header_logo.png&folderId=127892000000155021"
         )
 
         # Save HTML and get public URL
@@ -305,7 +306,8 @@ class CampaignGenerator:
             event_title=event_name,
             main_content=main_content,
             button_text="Event Details",
-            button_url="https://www.shireelite.com.au/athletes"
+            button_url="https://www.shireelite.com.au/athletes",
+            logo_url="https://campaigns.zoho.com.au/campaigns/org7001313022/imagebannerAction.do?imgName=Campaigns_email_header_logo.png&folderId=127892000000155021"
         )
 
         # Save HTML and get public URL
@@ -345,7 +347,8 @@ class CampaignGenerator:
             event_title=f"Cheer Clinics – {holiday_period}",
             main_content=main_content,
             button_text="Register Now",
-            button_url="https://www.shireelite.com.au/athletes"
+            button_url="https://www.shireelite.com.au/athletes",
+            logo_url="https://campaigns.zoho.com.au/campaigns/org7001313022/imagebannerAction.do?imgName=Campaigns_email_header_logo.png&folderId=127892000000155021"
         )
 
         # Save HTML and get public URL
