@@ -10,8 +10,10 @@ returns public URLs for content_url parameter in Zoho API.
 """
 
 import os
+import unicodedata
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
+from urllib.parse import quote
 from templates import EmailTemplates
 
 
@@ -28,6 +30,55 @@ CAMPAIGNS_DIR = os.path.join(os.path.dirname(__file__), 'docs', 'campaigns')
 def ensure_campaigns_dir():
     """Create docs/campaigns directory if it doesn't exist."""
     os.makedirs(CAMPAIGNS_DIR, exist_ok=True)
+
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitize a filename for use in URLs.
+
+    Replaces non-ASCII characters with ASCII equivalents:
+    - En-dash (–) → hyphen (-)
+    - Em-dash (—) → hyphen (-)
+    - Accented characters → unaccented equivalents
+    - Other non-ASCII → removed
+
+    Args:
+        filename: Original filename string (typically pre-processed: lowercased, spaces→hyphens)
+
+    Returns:
+        URL-safe filename with only ASCII characters
+    """
+    # Step 1: Replace smart quotes and dashes with ASCII equivalents BEFORE normalization
+    result = filename
+    result = result.replace('–', '-')      # en-dash
+    result = result.replace('—', '-')      # em-dash
+    result = result.replace('−', '-')      # minus sign
+    result = result.replace(''', "'")      # left single quote
+    result = result.replace(''', "'")      # right single quote
+    result = result.replace('"', '"')      # left double quote
+    result = result.replace('"', '"')      # right double quote
+
+    # Step 2: Normalize to NFD (decomposed form) to separate accents from base characters
+    normalized = unicodedata.normalize('NFD', result)
+
+    # Step 3: Remove combining characters (accents/diacritics)
+    ascii_only = ''.join(
+        char for char in normalized
+        if unicodedata.category(char) != 'Mn'  # Mn = Mark, Nonspacing (accents)
+    )
+
+    # Step 4: Keep only ASCII alphanumeric, hyphens, underscores, and dots
+    safe = ''
+    for char in ascii_only:
+        if ord(char) < 128 and (char.isalnum() or char in '-_.'):
+            safe += char
+        # Skip any remaining non-ASCII characters
+
+    # Step 5: Clean up any doubled hyphens that might have resulted
+    while '--' in safe:
+        safe = safe.replace('--', '-')
+
+    return safe
 
 
 class CampaignGenerator:
@@ -64,8 +115,10 @@ class CampaignGenerator:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
 
-            # Return the public URL
-            url = f"{self.base_url}/{filename}"
+            # Return the public URL with proper URL encoding
+            # quote() keeps ASCII alphanumeric and certain safe chars, encodes the rest
+            encoded_filename = quote(filename, safe='')
+            url = f"{self.base_url}/{encoded_filename}"
             print(f"    💾 Saved HTML: {filename}")
             print(f"    🌐 Public URL: {url}")
             return url
@@ -98,7 +151,8 @@ class CampaignGenerator:
 <p>Thanks!<br>Your Gym Team</p></body></html>"""
 
         # Save HTML and get public URL
-        filename = f"term-overview-{self.term_name.lower().replace(' ', '-')}.html"
+        safe_term_name = sanitize_filename(self.term_name.lower().replace(' ', '-'))
+        filename = f"term-overview-{safe_term_name}.html"
         content_url = self._save_html_and_get_url(body, filename)
 
         return {
@@ -168,7 +222,8 @@ class CampaignGenerator:
         body = rendered['body']
 
         # Save HTML and get public URL
-        filename = f"reminder-{event_name.lower().replace(' ', '-')}-{reminder_date.strftime('%Y%m%d')}.html"
+        safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
+        filename = f"reminder-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
         content_url = self._save_html_and_get_url(body, filename)
 
         return {
