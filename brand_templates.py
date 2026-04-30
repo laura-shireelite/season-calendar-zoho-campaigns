@@ -178,18 +178,18 @@ class ShireEliteTemplate:
   <div class="email-wrapper">
     <div class="email-container">
       <div class="header">
-        <img src="{logo}" alt="Shire Elite" style="max-width:180px; height:auto; display:block; margin:0 auto 8px;" />
+        <p style="font-size: 24px; font-weight: 900; color: #1a1a1a; margin: 0 0 8px; letter-spacing: -2px;">SHIRE ELITE</p>
+        <p style="font-size: 14px; font-weight: 400; color: #888888; margin: 0; letter-spacing: 2px;">CHEERLEADING</p>
       </div>
       <div class="content">
         <h1>{event_title}</h1>
         {main_content}
       </div>
       <div style="text-align:center; padding:30px 32px; background:#FFF9CC; border-top:1px solid #F0E68C;">
-        <p style="margin:0 0 8px; font-size:16px; line-height:1.4; font-weight:700; color:#1a1a1a;">{button_text}:</p>
-        <p style="margin:0 0 18px; font-size:15px; line-height:1.5; color:#444444;">
-          Dedicated info page with handy links, key dates, fees, timetables, and more:
+        <p style="margin:0 0 8px; font-size:16px; line-height:1.4; font-weight:700; color:#1a1a1a;">Quick reminder</p>
+        <p style="margin:0; font-size:15px; line-height:1.5; color:#444444;">
+          Your go-to for everything this season → <a href="https://www.shireelite.com.au/athletes" style="color:#3CAACB; text-decoration:none; font-weight:700;">shireelite.com.au/athletes</a>
         </p>
-        <a href="{button_url}" style="display:inline-block; min-width:220px; background:#3CAACB; color:#ffffff; text-decoration:none; padding:14px 24px; border-radius:8px; font-size:16px; font-weight:700;">{button_text}</a>
       </div>
       <div style="text-align:center; padding:28px 32px; background:#F7F7F7; border-top:1px solid #E6E6E6; font-size:14px; line-height:1.7; color:#444444;">
         <p style="margin:0 0 10px;"><strong>Athlete's Name:</strong> $[UD:FIRST_NAME||]$</p>
