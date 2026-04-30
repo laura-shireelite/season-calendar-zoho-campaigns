@@ -1,0 +1,23 @@
+{
+  "skill_name": "zoho-gym-campaigns",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need to create Zoho campaign drafts for Term 2 2026. My calendar is at https://docs.google.com/spreadsheets/d/1C0a_dA1t2W-ondcoVM1lhwgLzlZ8fbVcTZ-ivyogx5E/edit?gid=1719726418#gid=1719726418. I want a single 'all events' campaign at the term start that lists everything coming up, then reminder campaigns 3 days before each event. Can you show me what campaigns would be created?",
+      "expected_output": "The skill reads the spreadsheet, identifies all events for Term 2 2026, creates a summary showing: (1) the term-start campaign name and what it would contain, (2) a list of all reminder campaigns with dates, names, and event types. Output should be organized and easy to review.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Create Zoho Campaigns drafts for Term 3 2026. I have events for two different gyms (SE and SCA), some events apply to both. My event types are: Events, Terms, Gym Closures, Catch Ups, Fees, Cheer Clinics, and Other important dates. Show me what campaign drafts would be created, with each event type getting an appropriate email template. Organize by event type. Schedule reminders for 3 days before each event.",
+      "expected_output": "The skill creates a structured plan showing: (1) the term-start campaign with all events, (2) reminder campaigns grouped by event type (3 days before each event), (3) notes about which gym(s) each campaign targets, (4) sample subject lines and template descriptions for different event types.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I have a term with these key events: Term 3 starts (June 3, Terms, both gyms), Cheer Clinic Level 1 (June 10, Cheer Clinics, both gyms), Membership fees due (June 15, Fees, both gyms), Mid-term catch up (June 20, Catch Ups, both gyms), Studio showcase (June 30, Events, SE only), Gym closure for July 4th weekend (July 4, Gym Closures, both gyms). Create the campaign draft plan for this term. Include what the reminder campaigns would look like and when they'd be scheduled, with appropriate templates for each event type. Reminders should be 3 days before each event.",
+      "expected_output": "The skill produces a detailed campaign plan showing: (1) the all-events campaign listing all 6 events, (2) six reminder campaigns each 3 days before the event, with appropriate templates applied by event type, (3) clear indication of gym targeting (SE, SCA, or Both), (4) sample subject lines showing variety by event type.",
+      "files": []
+    }
+  ]
+}

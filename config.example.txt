@@ -1,0 +1,22 @@
+# Zoho Gym Campaigns Skill - Configuration Template
+#
+# Before running the skill, set these environment variables with your actual values.
+# Copy this file to config.txt and fill in your actual credentials.
+#
+# How to get these values:
+# 1. GOOGLE_SHEET_URL: Full URL of your gym's calendar Google Sheet
+#    Example: https://docs.google.com/spreadsheets/d/1abc123.../edit
+#
+# 2. GOOGLE_SERVICE_ACCOUNT_JSON: Path to your Google service account JSON file
+#    - You should have received this file when setting up Google Cloud
+#    - It's the file that looks like: calendar-campaigns-automation.json
+#    - Provide the FULL PATH to this file (e.g., /home/user/path/to/calendar-campaigns-automation.json)
+#
+# 3. ZOHO_REFRESH_TOKEN: Your Zoho Campaigns refresh token
+#    - Go to Zoho Campaigns > Settings > API Keys
+#    - Generate a grant code and exchange it for tokens
+#    - Copy the REFRESH TOKEN (the long one, not access token)
+
+export GOOGLE_SHEET_URL="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit"
+export GOOGLE_SERVICE_ACCOUNT_JSON="/path/to/calendar-campaigns-automation.json"
+export ZOHO_REFRESH_TOKEN="YOUR_ZOHO_REFRESH_TOKEN_HERE"
