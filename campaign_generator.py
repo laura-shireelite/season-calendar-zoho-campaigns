@@ -14,7 +14,7 @@ import unicodedata
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from urllib.parse import quote
-from templates import EmailTemplates
+from brand_templates import ShireEliteTemplate
 
 
 # GitHub Pages configuration
@@ -147,9 +147,12 @@ class CampaignGenerator:
 
         # Build the event list for the email body
         if non_clinic_events:
-            events_list = "\n".join([f"• {event.get('Event Name', '')}" for event in non_clinic_events])
+            events_html = "<ul>"
+            for event in non_clinic_events:
+                events_html += f"<li>{event.get('Event Name', '')}</li>"
+            events_html += "</ul>"
         else:
-            events_list = "Check back soon for event details!"
+            events_html = "<p>Check back soon for event details!</p>"
 
         # Get term dates
         term_start = self.events[0].get('Date', 'TBA') if self.events else 'TBA'
@@ -158,22 +161,27 @@ class CampaignGenerator:
             if 'end' in event.get('Event Name', '').lower() and 'terms' in event.get('Event Type', '').lower():
                 term_end = event.get('Date', 'TBA')
 
-        # Build email body
+        # Build email body content
         subject = f"📅 {self.term_name} – What's Coming Up"
 
-        body = f"""<html><body>
-<h2>📅 {self.term_name}</h2>
-<p><strong>Term Runs:</strong> {term_start} to {term_end}</p>
+        main_content = f"""<p><strong>Term Runs:</strong> {term_start} to {term_end}</p>
 <p><strong>Upcoming events:</strong></p>
-<p>{events_list.replace(chr(10), '<br>')}</p>
+{events_html}
 <p>You'll receive reminders 3 days before each event. Holiday clinics will be announced separately!</p>
-<p>Thanks!<br>Your Gym Team</p>
-</body></html>"""
+<p>Thanks!<br>Your Gym Team</p>"""
+
+        # Render using brand template
+        html_body = ShireEliteTemplate.render(
+            event_title=f"📅 {self.term_name}",
+            main_content=main_content,
+            button_text="Athletes Page",
+            button_url="https://www.shireelite.com.au/athletes"
+        )
 
         # Save HTML and get public URL
         safe_term_name = sanitize_filename(self.term_name.lower().replace(' ', '-'))
         filename = f"term-overview-{safe_term_name}.html"
-        content_url = self._save_html_and_get_url(body, filename)
+        content_url = self._save_html_and_get_url(html_body, filename)
 
         return {
             'name': campaign_name,
@@ -288,18 +296,22 @@ class CampaignGenerator:
         # Campaign name
         campaign_name = f"{event_name} - 3 Day Reminder"
 
-        # Render email from template
-        rendered = EmailTemplates.render_template(
-            event_type, event_name, event_date_str, event
-        )
+        # Build email content based on event type
+        subject = f"⏰ {event_name} – 3 Day Reminder"
+        main_content = self._build_event_content(event_type, event_name, event_date_str, event)
 
-        subject = rendered['subject']
-        body = rendered['body']
+        # Render using brand template
+        html_body = ShireEliteTemplate.render(
+            event_title=event_name,
+            main_content=main_content,
+            button_text="Event Details",
+            button_url="https://www.shireelite.com.au/athletes"
+        )
 
         # Save HTML and get public URL
         safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
         filename = f"reminder-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
-        content_url = self._save_html_and_get_url(body, filename)
+        content_url = self._save_html_and_get_url(html_body, filename)
 
         return {
             'name': campaign_name,
@@ -314,27 +326,32 @@ class CampaignGenerator:
 
     def _build_holiday_clinic_campaign(self, holiday_period: str, clinic_events: List[Dict], reminder_date: datetime) -> Dict:
         """Build a campaign for grouped holiday clinics (e.g., all Winter Hols clinics together)."""
-        # Combine dates from all clinic events
+        # Combine dates from all clinic events (for email body)
         clinic_dates = [e.get('Date', '') for e in clinic_events]
         combined_dates = " / ".join(clinic_dates)
 
-        campaign_name = f"Cheer Clinics – {holiday_period}"
+        # Simplified campaign name (for Zoho API - no special characters)
+        campaign_name = f"Holiday Clinics - {holiday_period}"
 
-        # Use holiday clinics template
-        rendered = EmailTemplates.render_template(
-            'holiday clinics',
-            campaign_name,
-            combined_dates,
-            {'events': clinic_events}
+        # Build email content for holiday clinics
+        subject = f"🎉 Cheer Clinics – {holiday_period}"
+        main_content = f"""<p>Join us for exciting cheer clinics during the {holiday_period} holiday break!</p>
+<p><strong>📅 Dates:</strong> {combined_dates}</p>
+<p>Perfect opportunity to improve your skills, meet other cheerleaders, and have fun!</p>
+<p>Limited spots available – register early to secure your place.</p>"""
+
+        # Render using brand template
+        html_body = ShireEliteTemplate.render(
+            event_title=f"Cheer Clinics – {holiday_period}",
+            main_content=main_content,
+            button_text="Register Now",
+            button_url="https://www.shireelite.com.au/athletes"
         )
-
-        subject = rendered['subject']
-        body = rendered['body']
 
         # Save HTML and get public URL
         safe_period = sanitize_filename(holiday_period.lower().replace(' ', '-'))
         filename = f"reminder-holiday-clinics-{safe_period}-{reminder_date.strftime('%Y%m%d')}.html"
-        content_url = self._save_html_and_get_url(body, filename)
+        content_url = self._save_html_and_get_url(html_body, filename)
 
         return {
             'name': f"{campaign_name} - 3 Day Reminder",
@@ -346,6 +363,44 @@ class CampaignGenerator:
             'reminder_date': reminder_date.strftime('%Y-%m-%d'),
             'target_gym': 'All'
         }
+
+    def _build_event_content(self, event_type: str, event_name: str, event_date_str: str, event: Dict) -> str:
+        """
+        Build HTML content for an event based on its type.
+
+        Args:
+            event_type: Type of event (e.g., 'Events', 'Gym Closures', 'Terms')
+            event_name: Name of the event
+            event_date_str: Date string for the event
+            event: Full event dict for additional context
+
+        Returns:
+            HTML string with event content
+        """
+        event_type_lower = event_type.strip().lower()
+
+        if 'gym closure' in event_type_lower:
+            return f"""<p>Please note: Our gym will be closed for maintenance.</p>
+<p><strong>📅 Closure Period:</strong> {event_date_str}</p>
+<p>We apologize for any inconvenience. We'll be back to our normal schedule shortly!</p>
+<p>If you have any questions, please don't hesitate to contact us.</p>"""
+
+        elif 'fee' in event_type_lower or 'payment' in event_type_lower:
+            return f"""<p>Please remember to submit your payment for the upcoming term.</p>
+<p><strong>📅 Due Date:</strong> {event_date_str}</p>
+<p>Payment details are available in your account. Thank you!</p>"""
+
+        elif 'important' in event_type_lower:
+            return f"""<p><strong>⚠️ Important Update:</strong> {event_name}</p>
+<p><strong>📅 Date:</strong> {event_date_str}</p>
+<p>Please take a moment to read this important information.</p>"""
+
+        else:
+            # Default for regular events and other types
+            return f"""<p>You're invited to an exciting event!</p>
+<p><strong>📅 Date:</strong> {event_date_str}</p>
+<p>Join us for this amazing opportunity! Whether you're competing or cheering, this promises to be an unforgettable event!</p>
+<p>Get ready to shine! 🌟</p>"""
 
     @staticmethod
     def _parse_date(date_str: str) -> datetime:

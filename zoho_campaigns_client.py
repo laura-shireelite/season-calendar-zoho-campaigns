@@ -235,9 +235,11 @@ class ZohoCampaignsClient:
             # Make the API request
             url = f"{self.BASE_URL}/createCampaign"
             print(f"    📤 Creating: {campaign_name}")
+            print(f"    📋 Payload keys: {list(payload.keys())}")
             response = requests.post(url, data=payload, headers=headers, timeout=30)
 
             # Check response status
+            print(f"    📊 Response status: {response.status_code}")
             if response.status_code in [200, 201]:
                 try:
                     data = response.json()
@@ -256,6 +258,10 @@ class ZohoCampaignsClient:
                         error_code = data.get('code', 'Unknown')
                         error_msg = data.get('message', 'Unknown error')
                         print(f"    ❌ API Error {error_code}: {error_msg}")
+                        print(f"    📊 Full response: {data}")
+                        print(f"    📋 Campaign name: {campaign_name}")
+                        print(f"    📋 Subject: {payload.get('subject', 'N/A')[:100]}")
+                        print(f"    📋 Content URL: {payload.get('content_url', 'N/A')[:100]}")
                         return ""
 
                 except Exception as e:
