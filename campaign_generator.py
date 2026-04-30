@@ -176,7 +176,7 @@ class CampaignGenerator:
             main_content=main_content,
             button_text="Athletes Page",
             button_url="https://www.shireelite.com.au/athletes",
-            logo_url="https://stratus.campaign-image.com.au/images/campaigns_email_header_logo_zc_v2_4913000011842364.png"
+            logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
         )
 
         # Save HTML and get public URL
@@ -307,7 +307,7 @@ class CampaignGenerator:
             main_content=main_content,
             button_text="Event Details",
             button_url="https://www.shireelite.com.au/athletes",
-            logo_url="https://stratus.campaign-image.com.au/images/campaigns_email_header_logo_zc_v2_4913000011842364.png"
+            logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
         )
 
         # Save HTML and get public URL
@@ -348,7 +348,7 @@ class CampaignGenerator:
             main_content=main_content,
             button_text="Register Now",
             button_url="https://www.shireelite.com.au/athletes",
-            logo_url="https://stratus.campaign-image.com.au/images/campaigns_email_header_logo_zc_v2_4913000011842364.png"
+            logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
         )
 
         # Save HTML and get public URL
