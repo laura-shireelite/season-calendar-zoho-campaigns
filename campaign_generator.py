@@ -5,26 +5,105 @@ Builds campaign content for Zoho Campaigns including subject lines,
 email bodies, and metadata. Handles both term-start overviews and
 individual reminder campaigns.
 
-With GitHub Pages hosting: Saves HTML files to docs/campaigns/ and
-returns public URLs for content_url parameter in Zoho API.
+Uses master template approach: Fetches the template HTML from Zoho,
+replaces placeholders, and uses the modified template for all campaigns.
 """
 
 import os
 import unicodedata
+import re
+import requests
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from urllib.parse import quote
-from brand_templates import ShireEliteTemplate
 
 
-# GitHub Pages configuration
-# Update these for your GitHub setup
-GITHUB_USERNAME = os.getenv('GITHUB_USERNAME', 'your-username')
-GITHUB_REPO = os.getenv('GITHUB_REPO', 'zoho-gym-campaigns')
-GITHUB_PAGES_BASE_URL = f"https://{GITHUB_USERNAME}.github.io/{GITHUB_REPO}/campaigns"
+# Zoho Campaigns API configuration
+ZOHO_ORG_ID = os.getenv('ZOHO_ORG_ID', '7001313022')
+ZOHO_REFRESH_TOKEN = os.getenv('ZOHO_REFRESH_TOKEN')
+ZOHO_CLIENT_ID = os.getenv('ZOHO_CLIENT_ID')
+ZOHO_CLIENT_SECRET = os.getenv('ZOHO_CLIENT_SECRET')
+ZOHO_API_BASE = "https://campaigns.zoho.com.au/api/v1"
 
-# Local file paths
+# Master template ID with logo already embedded
+MASTER_TEMPLATE_ID = "4913000011840304"
+
+# Local file paths (for backup, if needed)
 CAMPAIGNS_DIR = os.path.join(os.path.dirname(__file__), 'docs', 'campaigns')
+
+
+def get_zoho_access_token() -> str:
+    """
+    Get a fresh Zoho API access token using the refresh token.
+
+    Returns:
+        Access token string
+
+    Raises:
+        Exception if token retrieval fails
+    """
+    if not all([ZOHO_REFRESH_TOKEN, ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET]):
+        raise ValueError("Missing Zoho API credentials in environment variables")
+
+    url = "https://accounts.zoho.com.au/oauth/v2/token"
+    params = {
+        'refresh_token': ZOHO_REFRESH_TOKEN,
+        'client_id': ZOHO_CLIENT_ID,
+        'client_secret': ZOHO_CLIENT_SECRET,
+        'grant_type': 'refresh_token'
+    }
+
+    response = requests.post(url, params=params)
+    response.raise_for_status()
+    return response.json()['access_token']
+
+
+def fetch_master_template_html() -> str:
+    """
+    Load the master template HTML from the local file.
+
+    The master template is stored locally and contains the Shire Elite branding
+    with logo, styling, and placeholders for dynamic content.
+
+    Returns:
+        HTML string of the master template
+
+    Raises:
+        Exception if template file is not found
+    """
+    template_path = os.path.join(os.path.dirname(__file__), 'master_template.html')
+
+    if not os.path.exists(template_path):
+        raise FileNotFoundError(f"Master template not found at {template_path}")
+
+    try:
+        with open(template_path, 'r', encoding='utf-8') as f:
+            html = f.read()
+        return html
+    except Exception as e:
+        print(f"❌ Failed to load master template: {e}")
+        raise
+
+
+def replace_template_placeholders(html: str, heading: str, body: str) -> str:
+    """
+    Replace placeholders in the master template HTML.
+
+    Args:
+        html: Master template HTML
+        heading: Text to replace "HEADING CONTENT"
+        body: HTML to replace "BODY CONTENT"
+
+    Returns:
+        Modified HTML with placeholders replaced
+    """
+    # Replace HEADING CONTENT placeholder
+    modified_html = html.replace('HEADING CONTENT', heading)
+
+    # Replace BODY CONTENT placeholder
+    modified_html = modified_html.replace('BODY CONTENT', body)
+
+    return modified_html
 
 
 def ensure_campaigns_dir():
@@ -82,21 +161,35 @@ def sanitize_filename(filename: str) -> str:
 
 
 class CampaignGenerator:
-    """Generates campaign content for a gym term."""
+    """Generates campaign content for a gym term using master template approach."""
 
-    def __init__(self, term_name: str, events: List[Dict], base_url: Optional[str] = None):
+    def __init__(self, term_name: str, events: List[Dict], use_master_template: bool = True):
         """
         Initialize the generator.
 
         Args:
             term_name: Name of the term (e.g., "Term 2 2026")
             events: List of event dictionaries for this term (sorted by date)
-            base_url: Optional override for GitHub Pages base URL (defaults to env var)
+            use_master_template: If True, use master template from Zoho (recommended).
+                                If False, fall back to GitHub Pages HTML generation.
         """
         self.term_name = term_name
         self.events = events
-        self.base_url = base_url or GITHUB_PAGES_BASE_URL
+        self.use_master_template = use_master_template
+        self.master_template_html = None
+        self.base_url = "https://laura-shireelite.github.io/season-calendar-zoho-campaigns/campaigns"
+
         ensure_campaigns_dir()
+
+        # Fetch master template once if using the master template approach
+        if self.use_master_template:
+            try:
+                self.master_template_html = fetch_master_template_html()
+                print(f"✅ Master template loaded (ID: {MASTER_TEMPLATE_ID})")
+            except Exception as e:
+                print(f"⚠️  Could not load master template: {e}")
+                print("   Falling back to GitHub Pages approach")
+                self.use_master_template = False
 
     def _save_html_and_get_url(self, html_content: str, filename: str) -> str:
         """
@@ -131,7 +224,7 @@ class CampaignGenerator:
         Create the term-start campaign listing all events (excluding holiday clinics).
 
         Returns:
-            Campaign dict ready for Zoho API with content_url pointing to hosted HTML
+            Campaign dict ready for Zoho API
         """
         if not self.events:
             return {}
@@ -164,29 +257,43 @@ class CampaignGenerator:
         # Build email body content
         subject = f"📅 {self.term_name} – What's Coming Up"
 
-        main_content = f"""<p><strong>Term Runs:</strong> {term_start} to {term_end}</p>
+        heading = f"📅 {self.term_name}"
+
+        body_content = f"""<p><strong>Term Runs:</strong> {term_start} to {term_end}</p>
 <p><strong>Upcoming events:</strong></p>
 {events_html}
 <p>You'll receive reminders 3 days before each event. Holiday clinics will be announced separately!</p>
 <p>Thanks!<br>Your Gym Team</p>"""
 
-        # Render using brand template
-        html_body = ShireEliteTemplate.render(
-            event_title=f"📅 {self.term_name}",
-            main_content=main_content,
-            button_text="Athletes Page",
-            button_url="https://www.shireelite.com.au/athletes",
-            logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
-        )
-
-        # Save HTML and get public URL
-        safe_term_name = sanitize_filename(self.term_name.lower().replace(' ', '-'))
-        filename = f"term-overview-{safe_term_name}.html"
-        content_url = self._save_html_and_get_url(html_body, filename)
+        # Use master template if available
+        if self.use_master_template and self.master_template_html:
+            html_body = replace_template_placeholders(
+                self.master_template_html,
+                heading=heading,
+                body=body_content
+            )
+            # Save to GitHub Pages so Zoho can access it
+            safe_term_name = sanitize_filename(self.term_name.lower().replace(' ', '-'))
+            filename = f"term-overview-{safe_term_name}.html"
+            content_url = self._save_html_and_get_url(html_body, filename)
+        else:
+            # Fallback to GitHub approach
+            from brand_templates import ShireEliteTemplate
+            html_body = ShireEliteTemplate.render(
+                event_title=heading,
+                main_content=body_content,
+                button_text="Athletes Page",
+                button_url="https://www.shireelite.com.au/athletes",
+                logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
+            )
+            safe_term_name = sanitize_filename(self.term_name.lower().replace(' ', '-'))
+            filename = f"term-overview-{safe_term_name}.html"
+            content_url = self._save_html_and_get_url(html_body, filename)
 
         return {
             'name': campaign_name,
             'subject': subject,
+            'html_body': None,
             'content_url': content_url,
             'from_name': self._get_gym_from_name(),
             'type': 'term_overview',
@@ -299,25 +406,37 @@ class CampaignGenerator:
 
         # Build email content based on event type
         subject = f"⏰ {event_name} – 3 Day Reminder"
-        main_content = self._build_event_content(event_type, event_name, event_date_str, event)
+        body_content = self._build_event_content(event_type, event_name, event_date_str, event)
 
-        # Render using brand template
-        html_body = ShireEliteTemplate.render(
-            event_title=event_name,
-            main_content=main_content,
-            button_text="Event Details",
-            button_url="https://www.shireelite.com.au/athletes",
-            logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
-        )
-
-        # Save HTML and get public URL
-        safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
-        filename = f"reminder-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
-        content_url = self._save_html_and_get_url(html_body, filename)
+        # Use master template if available
+        if self.use_master_template and self.master_template_html:
+            html_body = replace_template_placeholders(
+                self.master_template_html,
+                heading=event_name,
+                body=body_content
+            )
+            # Save to GitHub Pages so Zoho can access it
+            safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
+            filename = f"reminder-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+            content_url = self._save_html_and_get_url(html_body, filename)
+        else:
+            # Fallback to GitHub approach
+            from brand_templates import ShireEliteTemplate
+            html_body = ShireEliteTemplate.render(
+                event_title=event_name,
+                main_content=body_content,
+                button_text="Event Details",
+                button_url="https://www.shireelite.com.au/athletes",
+                logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
+            )
+            safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
+            filename = f"reminder-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+            content_url = self._save_html_and_get_url(html_body, filename)
 
         return {
             'name': campaign_name,
             'subject': subject,
+            'html_body': None,
             'content_url': content_url,
             'from_name': self._get_gym_from_name(),
             'type': 'reminder',
@@ -337,28 +456,41 @@ class CampaignGenerator:
 
         # Build email content for holiday clinics
         subject = f"🎉 Cheer Clinics – {holiday_period}"
-        main_content = f"""<p>Join us for exciting cheer clinics during the {holiday_period} holiday break!</p>
+        heading = f"Cheer Clinics – {holiday_period}"
+        body_content = f"""<p>Join us for exciting cheer clinics during the {holiday_period} holiday break!</p>
 <p><strong>📅 Dates:</strong> {combined_dates}</p>
 <p>Perfect opportunity to improve your skills, meet other cheerleaders, and have fun!</p>
 <p>Limited spots available – register early to secure your place.</p>"""
 
-        # Render using brand template
-        html_body = ShireEliteTemplate.render(
-            event_title=f"Cheer Clinics – {holiday_period}",
-            main_content=main_content,
-            button_text="Register Now",
-            button_url="https://www.shireelite.com.au/athletes",
-            logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
-        )
-
-        # Save HTML and get public URL
-        safe_period = sanitize_filename(holiday_period.lower().replace(' ', '-'))
-        filename = f"reminder-holiday-clinics-{safe_period}-{reminder_date.strftime('%Y%m%d')}.html"
-        content_url = self._save_html_and_get_url(html_body, filename)
+        # Use master template if available
+        if self.use_master_template and self.master_template_html:
+            html_body = replace_template_placeholders(
+                self.master_template_html,
+                heading=heading,
+                body=body_content
+            )
+            # Save to GitHub Pages so Zoho can access it
+            safe_period = sanitize_filename(holiday_period.lower().replace(' ', '-'))
+            filename = f"reminder-holiday-clinics-{safe_period}-{reminder_date.strftime('%Y%m%d')}.html"
+            content_url = self._save_html_and_get_url(html_body, filename)
+        else:
+            # Fallback to GitHub approach
+            from brand_templates import ShireEliteTemplate
+            html_body = ShireEliteTemplate.render(
+                event_title=heading,
+                main_content=body_content,
+                button_text="Register Now",
+                button_url="https://www.shireelite.com.au/athletes",
+                logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
+            )
+            safe_period = sanitize_filename(holiday_period.lower().replace(' ', '-'))
+            filename = f"reminder-holiday-clinics-{safe_period}-{reminder_date.strftime('%Y%m%d')}.html"
+            content_url = self._save_html_and_get_url(html_body, filename)
 
         return {
             'name': f"{campaign_name} - 3 Day Reminder",
             'subject': subject,
+            'html_body': None,
             'content_url': content_url,
             'from_name': self._get_gym_from_name(),
             'type': 'reminder',

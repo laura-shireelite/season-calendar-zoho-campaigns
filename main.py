@@ -325,37 +325,74 @@ def main():
     generator = CampaignGenerator(term_name, term_events)
 
     try:
+        # Track all campaigns for scheduling
+        campaigns_to_schedule = []
+
         # Create term-start campaign
         term_campaign = generator.create_term_start_campaign()
-        result = zoho_client.create_campaign_draft(term_campaign)
-        if result:
+        campaign_id = zoho_client.create_campaign_draft(term_campaign)
+        if campaign_id:
             print(f"✅ Created term campaign: {term_campaign['name']}")
+            # Schedule for day before term starts
+            schedule_date = term_start - timedelta(days=1)
+            campaigns_to_schedule.append({
+                'id': campaign_id,
+                'name': term_campaign['name'],
+                'send_date': schedule_date
+            })
 
         # Create reminder campaigns
         reminder_campaigns = generator.create_reminder_campaigns()
         created_count = 0
         for reminder in reminder_campaigns:
-            result = zoho_client.create_campaign_draft(reminder)
-            if result:
+            campaign_id = zoho_client.create_campaign_draft(reminder)
+            if campaign_id:
                 created_count += 1
+                # Extract reminder date from campaign dict
+                reminder_date_str = reminder.get('reminder_date', '')
+                if reminder_date_str:
+                    try:
+                        schedule_date = datetime.strptime(reminder_date_str, '%Y-%m-%d')
+                        campaigns_to_schedule.append({
+                            'id': campaign_id,
+                            'name': reminder['name'],
+                            'send_date': schedule_date
+                        })
+                    except ValueError:
+                        pass
 
         print(f"✅ Created {created_count}/{len(reminder_campaigns)} reminder campaigns")
+
+        # Step 7: Schedule all campaigns
+        print("\n📅 Scheduling campaigns...")
+        scheduled_count = 0
+        for campaign in campaigns_to_schedule:
+            if zoho_client.schedule_campaign(campaign['id'], campaign['send_date']):
+                scheduled_count += 1
+
+        print(f"✅ Scheduled {scheduled_count}/{len(campaigns_to_schedule)} campaigns")
 
     except Exception as e:
         print(f"❌ Failed to create campaigns: {e}")
         sys.exit(1)
 
-    # Step 7: Summary
+    # Step 8: Summary
     print("\n" + "="*70)
     print("✅ SKILL COMPLETED SUCCESSFULLY")
     print("="*70)
     print(f"\nCreated campaigns for: {term_name}")
-    print(f"Total campaigns: {1 + created_count} (1 term overview + {created_count} reminders)")
-    print("\n📌 Next steps:")
+    print(f"Total campaigns: {len(campaigns_to_schedule)} (1 term overview + {created_count} reminders)")
+    print(f"✅ All campaigns have been scheduled for automatic sending!")
+    print("\n📌 Next steps (optional):")
+    print("   If you want the Shire Elite logo to display in emails:")
     print("   1. Log into Zoho Campaigns")
-    print("   2. Review your campaign drafts")
-    print("   3. Edit templates/content as needed")
-    print("   4. Set send dates and send to your audience")
+    print("   2. For EACH campaign draft:")
+    print("      • Open the campaign")
+    print("      • Click 'Create Content'")
+    print("      • Copy and paste the master template HTML")
+    print("      • (The Shire Elite logo will display automatically)")
+    print("\n   Otherwise, campaigns will send with content from the auto-generated HTML.")
+    print("\n   💡 Tip: The master template HTML is in: master_template.html")
     print("\n")
 
 

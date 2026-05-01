@@ -133,46 +133,49 @@ class ZohoCampaignsClient:
 
         return {}
 
-    def create_campaign_draft(self, campaign: dict) -> bool:
+    def create_campaign_draft(self, campaign: dict) -> str:
         """
         Create a campaign draft in Zoho Campaigns with hosted HTML content.
-
-        The campaign dict should contain 'content_url' pointing to publicly hosted HTML.
+        If html_body is provided, also updates the campaign content internally.
 
         Args:
-            campaign: Campaign dict with keys: name, subject, content_url, from_name, type, target_gym
+            campaign: Campaign dict with keys: name, subject, content_url, html_body, from_name, type, target_gym
 
         Returns:
-            True if successful, False otherwise
+            Campaign ID if successful, empty string otherwise
         """
         self._ensure_token_valid()
 
         if not self.access_token:
             print(f"    ❌ No access token available")
-            return False
+            return ""
 
         try:
             campaign_name = campaign.get('name', 'Untitled Campaign')
             subject = campaign.get('subject', '')
             content_url = campaign.get('content_url', '')  # Public URL to hosted HTML
+            html_body = campaign.get('html_body', '')  # HTML content for internal update
             target_gym = campaign.get('target_gym', 'All')
 
             # Create the campaign with content_url pointing to hosted HTML
             campaign_id = self._create_campaign_draft(campaign_name, subject, target_gym, content_url)
             if not campaign_id:
-                return False
+                return ""
 
-            return True
+            # Content is loaded from external content_url
+            # To add logo: manually replace with master_template.html content in Zoho UI
+
+            return campaign_id
 
         except requests.exceptions.Timeout:
             print(f"    ❌ Request timeout - Zoho server may be slow")
-            return False
+            return ""
         except requests.exceptions.ConnectionError:
             print(f"    ❌ Connection error - Check internet connection")
-            return False
+            return ""
         except Exception as e:
             print(f"    ❌ Exception: {str(e)[:100]}")
-            return False
+            return ""
 
     def _create_campaign_draft(self, campaign_name: str, subject: str, target_gym: str, content_url: str = "") -> str:
         """
@@ -250,9 +253,16 @@ class ZohoCampaignsClient:
                     has_campaign_key = 'campaignKey' in data or 'campaign_id' in data
 
                     if code in ['200', '201'] or has_campaign_key:
-                        campaign_id = data.get('campaign_id') or data.get('campaignKey', '')
-                        print(f"    ✅ Created: {campaign_name} (ID: {campaign_id})")
-                        return campaign_id
+                        # Get the campaign key - try both possible field names
+                        campaign_key = data.get('campaignKey') or data.get('campaign_id') or data.get('campaign_key', '')
+                        print(f"    ✅ Created: {campaign_name} (ID: {campaign_key})")
+                        # Debug: print response keys to verify structure
+                        print(f"    📊 Response keys: {list(data.keys())}")
+                        if 'campaignKey' in data:
+                            print(f"    📋 campaignKey: {data['campaignKey']}")
+                        if 'campaign_id' in data:
+                            print(f"    📋 campaign_id: {data['campaign_id']}")
+                        return campaign_key
                     else:
                         # API returned JSON but with error code
                         error_code = data.get('code', 'Unknown')
@@ -354,4 +364,64 @@ class ZohoCampaignsClient:
 
         except Exception as e:
             print(f"    ⚠️  Error setting content: {str(e)[:100]}")
+            return False
+
+    def schedule_campaign(self, campaign_id: str, send_date: datetime, send_hour: int = 9, send_minute: int = 0) -> bool:
+        """
+        Schedule a campaign for sending at a specific date and time.
+
+        Args:
+            campaign_id: Campaign ID returned from campaign creation
+            send_date: datetime object for when to send the campaign
+            send_hour: Hour (1-12 in 12-hour format, default 9 for 9 AM)
+            send_minute: Minute (0-55, default 0)
+
+        Returns:
+            True if scheduled successfully, False otherwise
+        """
+        self._ensure_token_valid()
+
+        if not self.access_token or not campaign_id:
+            return False
+
+        try:
+            url = f"{self.BASE_URL}/sendcampaign?isschedule=true"
+
+            payload = {
+                'campaignkey': campaign_id,
+                'scheduledate': send_date.strftime('%m/%d/%Y'),
+                'schedulehour': str(send_hour).zfill(2),
+                'scheduleminute': str(send_minute).zfill(2),
+                'am_pm': 'AM' if send_hour < 12 else 'PM',
+                'resfmt': 'json'
+            }
+
+            headers = {
+                "Authorization": f"Zoho-oauthtoken {self.access_token}",
+            }
+
+            response = requests.post(url, data=payload, headers=headers, timeout=30)
+
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    code = str(data.get('code', ''))
+
+                    if code == '200':
+                        print(f"    ✅ Scheduled: {send_date.strftime('%Y-%m-%d')} at {send_hour:02d}:{send_minute:02d} AM")
+                        return True
+                    else:
+                        error_msg = data.get('message', 'Unknown error')
+                        error_code = data.get('code', 'Unknown')
+                        print(f"    ⚠️  Could not schedule (error {error_code}): {error_msg}")
+                        return False
+                except:
+                    print(f"    ⚠️  Could not parse schedule response")
+                    return False
+            else:
+                print(f"    ⚠️  Schedule request failed: {response.status_code}")
+                return False
+
+        except Exception as e:
+            print(f"    ⚠️  Error scheduling campaign: {str(e)[:100]}")
             return False
