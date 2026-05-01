@@ -248,8 +248,8 @@ class ZohoCampaignsClient:
                     data = response.json()
 
                     # Check if response indicates success
-                    # API returns code as string ('200') not integer
-                    code = str(data.get('code', ''))
+                    # API returns code as string ('200') not integer - handle both 'code' and 'Code' (case sensitivity)
+                    code = str(data.get('code') or data.get('Code', ''))
                     has_campaign_key = 'campaignKey' in data or 'campaign_id' in data
 
                     if code in ['200', '201'] or has_campaign_key:
@@ -265,8 +265,8 @@ class ZohoCampaignsClient:
                         return campaign_key
                     else:
                         # API returned JSON but with error code
-                        error_code = data.get('code', 'Unknown')
-                        error_msg = data.get('message', 'Unknown error')
+                        error_code = data.get('code') or data.get('Code', 'Unknown')
+                        error_msg = data.get('message') or data.get('Message', 'Unknown error')
                         print(f"    ❌ API Error {error_code}: {error_msg}")
                         print(f"    📊 Full response: {data}")
                         print(f"    📋 Campaign name: {campaign_name}")
