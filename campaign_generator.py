@@ -463,27 +463,27 @@ class CampaignGenerator:
                         print(f"    ✅ Grouped: '{holiday_period}' clinics → reminder on {reminder_date.strftime('%Y-%m-%d')}")
                     # Remove from dict so we don't process it again
                     del holiday_clinic_groups[holiday_period]
-            # Handle Term ends + Gym closure grouping
+            # Skip gym closure events entirely (info is included in term end emails)
+            elif 'gym' in event_name.lower() and 'closure' in event_name.lower():
+                processed_events.add(event_id)
+                # No campaign created for gym closures - they're included in term end emails
+                continue
+            # Handle Term ends (including embedded gym closure + next term info)
             elif 'term' in event_name.lower() and 'end' in event_name.lower():
                 # Try to find related gym closure event
                 gym_closure = self._find_related_gym_closure(event, self.events)
-                if gym_closure and f"{gym_closure.get('Event Name', '')}_{gym_closure.get('Date', '')}" not in processed_events:
-                    # Create grouped campaign
-                    campaign = self._build_term_end_closure_campaign(event, gym_closure, reminder_date)
-                    if campaign:
-                        campaigns.append(campaign)
-                        processed_events.add(event_id)
+                # Create term end campaign (includes gym closure and next term dates if found)
+                campaign = self._build_term_end_closure_campaign(event, gym_closure, reminder_date)
+                if campaign:
+                    campaigns.append(campaign)
+                    processed_events.add(event_id)
+                    if gym_closure:
                         processed_events.add(f"{gym_closure.get('Event Name', '')}_{gym_closure.get('Date', '')}")
-                        print(f"    ✅ Grouped: Term end + Gym closure → reminder on {reminder_date.strftime('%Y-%m-%d')}")
-                else:
-                    # Create individual campaign for term end
-                    campaign = self._build_reminder_campaign(event, reminder_date)
-                    if campaign:
-                        campaigns.append(campaign)
-                        processed_events.add(event_id)
+                        print(f"    ✅ Term end (with closure info) → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+                    else:
                         print(f"    ✅ Event {idx+1}: '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
             else:
-                # Regular event or gym closure
+                # Regular event
                 campaign = self._build_reminder_campaign(event, reminder_date)
                 if campaign:
                     campaigns.append(campaign)
@@ -745,9 +745,51 @@ class CampaignGenerator:
 
         return None
 
+    def _find_next_term_start_date(self, term_end_event: Dict) -> Optional[str]:
+        """
+        Find the start date of the next term after a term end event.
+
+        Args:
+            term_end_event: The term end event
+
+        Returns:
+            Start date of next term as formatted string (e.g., "Mon 12 Oct"), or None
+        """
+        try:
+            term_end_date = self._parse_date(term_end_event.get('Date', ''))
+        except ValueError:
+            return None
+
+        # Look for "Term X begins" or similar events that come after this term end
+        next_term = None
+        min_days_after = float('inf')
+
+        for event in self.events:
+            event_name_lower = event.get('Event Name', '').lower()
+            event_type_lower = event.get('Event Type', '').lower()
+
+            # Look for term start events (not "ends")
+            if ('term' in event_name_lower or 'term' in event_type_lower) and 'end' not in event_name_lower:
+                try:
+                    event_date = self._parse_date(event.get('Date', ''))
+                    days_after = (event_date - term_end_date).days
+
+                    # Find the closest term start that comes after the term end
+                    if 0 < days_after < min_days_after:
+                        min_days_after = days_after
+                        next_term = event.get('Date', '')
+
+                except ValueError:
+                    continue
+
+        return next_term
+
     def _build_term_end_closure_campaign(self, term_end_event: Dict, closure_event: Dict, reminder_date: datetime) -> Dict:
         """
-        Build a combined campaign for term end + gym closure.
+        Build a term end campaign that includes gym closure and next term info.
+
+        Instead of creating separate campaigns for term end and gym closure,
+        this includes gym closure dates inline with the term end info.
 
         Args:
             term_end_event: The term end event
@@ -758,30 +800,31 @@ class CampaignGenerator:
             Campaign dict ready for Zoho API
         """
         term_name = term_end_event.get('Event Name', 'Term End')
-        closure_name = closure_event.get('Event Name', 'Gym Closure')
         term_date = term_end_event.get('Date', '')
         closure_date = closure_event.get('Date', '')
 
-        # Campaign name combines both events
-        # Use "and" instead of "&" to avoid Zoho API encoding issues
-        # Replace em-dashes with regular hyphens to avoid Zoho import errors (preserve full names)
-        term_base = term_name.replace('–', '-').replace('—', '-')
-        closure_base = closure_name.replace('–', '-').replace('—', '-')
+        # Find next term start date
+        next_term_date = self._find_next_term_start_date(term_end_event)
 
-        # Strip holiday suffixes from closure_base to keep campaign name shorter
-        # (e.g., "Gym Closure - Wk2 Spring School Hols" → "Gym Closure")
-        # This prevents filename truncation issues
-        import re
-        closure_base = re.sub(r'\s*-\s*(wk\d+|week\d+|spring|winter|summer|autumn|fall|hols|holidays|school\s+hols).*', '', closure_base, flags=re.IGNORECASE)
-
-        campaign_name = f"{term_base} and {closure_base}"
+        # Campaign name is just the term end (simple!)
+        campaign_name = term_name.replace('–', '-').replace('—', '-')
         subject = f"⏰ {campaign_name} - 3 Day Reminder"
 
-        # Build combined email content
-        body_content = f"""<p><strong>Last Day of Term:</strong> {term_date}</p>
-<p><strong>Gym Closure Dates:</strong> {closure_date}</p>
-<p>Please note the important dates above for your gym schedule.</p>
-<p>Thanks!<br>Your Gym Team</p>"""
+        # Build email content with all important dates
+        body_lines = [
+            f"<p><strong>Last Day of Term:</strong> {term_date}</p>"
+        ]
+
+        if closure_date:
+            body_lines.append(f"<p><strong>Gym Closure:</strong> {closure_date}</p>")
+
+        if next_term_date:
+            body_lines.append(f"<p><strong>Term Resumes:</strong> {next_term_date}</p>")
+
+        body_lines.append("<p>Please note these important dates for your gym schedule.</p>")
+        body_lines.append("<p>Thanks!<br>Your Gym Team</p>")
+
+        body_content = "\n".join(body_lines)
 
         # Use master template if available
         if self.use_master_template and self.master_template_html:
