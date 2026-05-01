@@ -463,25 +463,19 @@ class CampaignGenerator:
                         print(f"    ✅ Grouped: '{holiday_period}' clinics → reminder on {reminder_date.strftime('%Y-%m-%d')}")
                     # Remove from dict so we don't process it again
                     del holiday_clinic_groups[holiday_period]
-            # Skip gym closure events entirely (info is included in term end emails)
+            # Skip gym closure events entirely (not needed - athletes figure them out from gaps)
             elif 'gym' in event_name.lower() and 'closure' in event_name.lower():
                 processed_events.add(event_id)
-                # No campaign created for gym closures - they're included in term end emails
+                # No campaign created for gym closures
                 continue
-            # Handle Term ends (including embedded gym closure + next term info)
+            # Handle Term ends
             elif 'term' in event_name.lower() and 'end' in event_name.lower():
-                # Try to find related gym closure event
-                gym_closure = self._find_related_gym_closure(event, self.events)
-                # Create term end campaign (includes gym closure and next term dates if found)
-                campaign = self._build_term_end_closure_campaign(event, gym_closure, reminder_date)
+                # Create term end campaign (includes next term date)
+                campaign = self._build_term_end_campaign(event, reminder_date)
                 if campaign:
                     campaigns.append(campaign)
                     processed_events.add(event_id)
-                    if gym_closure:
-                        processed_events.add(f"{gym_closure.get('Event Name', '')}_{gym_closure.get('Date', '')}")
-                        print(f"    ✅ Term end (with closure info) → reminder on {reminder_date.strftime('%Y-%m-%d')}")
-                    else:
-                        print(f"    ✅ Event {idx+1}: '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+                    print(f"    ✅ Event {idx+1}: '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
             else:
                 # Regular event
                 campaign = self._build_reminder_campaign(event, reminder_date)
@@ -784,16 +778,15 @@ class CampaignGenerator:
 
         return next_term
 
-    def _build_term_end_closure_campaign(self, term_end_event: Dict, closure_event: Dict, reminder_date: datetime) -> Dict:
+    def _build_term_end_campaign(self, term_end_event: Dict, reminder_date: datetime) -> Dict:
         """
-        Build a term end campaign that includes gym closure and next term info.
+        Build a term end campaign that includes next term info.
 
-        Instead of creating separate campaigns for term end and gym closure,
-        this includes gym closure dates inline with the term end info.
+        Simple strategy: just show when this term ends and when the next term begins.
+        Athletes can figure out gym closure from the gap between dates.
 
         Args:
             term_end_event: The term end event
-            closure_event: The related gym closure event
             reminder_date: When to send the reminder
 
         Returns:
@@ -801,22 +794,18 @@ class CampaignGenerator:
         """
         term_name = term_end_event.get('Event Name', 'Term End')
         term_date = term_end_event.get('Date', '')
-        closure_date = closure_event.get('Date', '')
 
         # Find next term start date
         next_term_date = self._find_next_term_start_date(term_end_event)
 
-        # Campaign name is just the term end (simple!)
+        # Campaign name is just the term end
         campaign_name = term_name.replace('–', '-').replace('—', '-')
         subject = f"⏰ {campaign_name} - 3 Day Reminder"
 
-        # Build email content with all important dates
+        # Build simple email content
         body_lines = [
             f"<p><strong>Last Day of Term:</strong> {term_date}</p>"
         ]
-
-        if closure_date:
-            body_lines.append(f"<p><strong>Gym Closure:</strong> {closure_date}</p>")
 
         if next_term_date:
             body_lines.append(f"<p><strong>Term Resumes:</strong> {next_term_date}</p>")
