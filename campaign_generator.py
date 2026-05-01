@@ -58,12 +58,15 @@ def get_zoho_access_token() -> str:
     return response.json()['access_token']
 
 
-def fetch_master_template_html() -> str:
+def fetch_master_template_html(gym: str = 'SE') -> str:
     """
     Load the master template HTML from the local file.
 
-    The master template is stored locally and contains the Shire Elite branding
-    with logo, styling, and placeholders for dynamic content.
+    The master template is stored locally and contains gym branding
+    with styling and placeholders for dynamic content.
+
+    Args:
+        gym: Gym name ('SE' for Shire Elite, 'SCA' for SCA Allstars)
 
     Returns:
         HTML string of the master template
@@ -71,7 +74,10 @@ def fetch_master_template_html() -> str:
     Raises:
         Exception if template file is not found
     """
-    template_path = os.path.join(os.path.dirname(__file__), 'master_template.html')
+    if gym == 'SCA':
+        template_path = os.path.join(os.path.dirname(__file__), 'master_template_sca.html')
+    else:
+        template_path = os.path.join(os.path.dirname(__file__), 'master_template.html')
 
     if not os.path.exists(template_path):
         raise FileNotFoundError(f"Master template not found at {template_path}")
@@ -163,18 +169,20 @@ def sanitize_filename(filename: str) -> str:
 class CampaignGenerator:
     """Generates campaign content for a gym term using master template approach."""
 
-    def __init__(self, term_name: str, events: List[Dict], use_master_template: bool = True):
+    def __init__(self, term_name: str, events: List[Dict], gym: str = 'SE', use_master_template: bool = True):
         """
         Initialize the generator.
 
         Args:
             term_name: Name of the term (e.g., "Term 2 2026")
             events: List of event dictionaries for this term (sorted by date)
-            use_master_template: If True, use master template from Zoho (recommended).
+            gym: Gym name ('SE' for Shire Elite, 'SCA' for SCA Allstars)
+            use_master_template: If True, use master template (recommended).
                                 If False, fall back to GitHub Pages HTML generation.
         """
         self.term_name = term_name
         self.events = events
+        self.gym = gym
         self.use_master_template = use_master_template
         self.master_template_html = None
         self.base_url = "https://laura-shireelite.github.io/season-calendar-zoho-campaigns/campaigns"
@@ -184,8 +192,8 @@ class CampaignGenerator:
         # Fetch master template once if using the master template approach
         if self.use_master_template:
             try:
-                self.master_template_html = fetch_master_template_html()
-                print(f"✅ Master template loaded (ID: {MASTER_TEMPLATE_ID})")
+                self.master_template_html = fetch_master_template_html(gym=gym)
+                print(f"✅ Master template loaded for {gym} (ID: {MASTER_TEMPLATE_ID})")
             except Exception as e:
                 print(f"⚠️  Could not load master template: {e}")
                 print("   Falling back to GitHub Pages approach")
@@ -297,7 +305,7 @@ class CampaignGenerator:
             'content_url': content_url,
             'from_name': self._get_gym_from_name(),
             'type': 'term_overview',
-            'target_gym': 'Shire Elite'
+            'target_gym': self.gym
         }
 
     def create_reminder_campaigns(self) -> List[Dict]:
@@ -399,7 +407,6 @@ class CampaignGenerator:
         event_name = event.get('Event Name', '')
         event_type = event.get('Event Type', '')
         event_date_str = event.get('Date', '')
-        gym = event.get('Gym', 'All')
 
         # Campaign name
         campaign_name = f"{event_name} - 3 Day Reminder"
@@ -442,7 +449,7 @@ class CampaignGenerator:
             'type': 'reminder',
             'event_name': event_name,
             'reminder_date': reminder_date.strftime('%Y-%m-%d'),
-            'target_gym': gym
+            'target_gym': self.gym
         }
 
     def _build_holiday_clinic_campaign(self, holiday_period: str, clinic_events: List[Dict], reminder_date: datetime) -> Dict:
@@ -496,7 +503,7 @@ class CampaignGenerator:
             'type': 'reminder',
             'event_name': campaign_name,
             'reminder_date': reminder_date.strftime('%Y-%m-%d'),
-            'target_gym': 'All'
+            'target_gym': self.gym
         }
 
     def _build_event_content(self, event_type: str, event_name: str, event_date_str: str, event: Dict) -> str:
@@ -590,10 +597,12 @@ class CampaignGenerator:
 
         raise ValueError(f"Could not parse date: {date_str}")
 
-    @staticmethod
-    def _get_gym_from_name() -> str:
-        """Get the gym name for 'from' field. Can be customized."""
-        return "Shire Elite Gyms"
+    def _get_gym_from_name(self) -> str:
+        """Get the gym name for 'from' field based on target gym."""
+        if self.gym == 'SCA':
+            return "SCA Allstars"
+        else:
+            return "Shire Elite Gyms"
 
     def get_campaign_summary(self) -> Dict:
         """Get a summary of what campaigns will be created."""

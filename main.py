@@ -320,48 +320,79 @@ def main():
         print(f"❌ Failed to connect to Zoho: {e}")
         sys.exit(1)
 
-    # Step 6: Generate and create campaigns
+    # Step 6: Generate and create campaigns - gym-specific
     print("\n✍️  Creating campaigns...")
-    generator = CampaignGenerator(term_name, term_events)
 
     try:
         # Track all campaigns for scheduling
         campaigns_to_schedule = []
 
-        # Create term-start campaign
-        term_campaign = generator.create_term_start_campaign()
-        campaign_id = zoho_client.create_campaign_draft(term_campaign)
-        if campaign_id:
-            print(f"✅ Created term campaign: {term_campaign['name']}")
-            # Schedule for day before term starts
-            schedule_date = term_start - timedelta(days=1)
-            campaigns_to_schedule.append({
-                'id': campaign_id,
-                'name': term_campaign['name'],
-                'send_date': schedule_date
-            })
+        # Determine which gyms have events in this term
+        gyms_in_term = set()
+        for event in term_events:
+            event_gym = event.get('Gym', 'SE')
+            if event_gym == 'Both':
+                gyms_in_term.add('SE')
+                gyms_in_term.add('SCA')
+            else:
+                gyms_in_term.add(event_gym)
 
-        # Create reminder campaigns
-        reminder_campaigns = generator.create_reminder_campaigns()
-        created_count = 0
-        for reminder in reminder_campaigns:
-            campaign_id = zoho_client.create_campaign_draft(reminder)
+        print(f"   📍 Events for gyms: {', '.join(sorted(gyms_in_term))}")
+
+        total_reminder_count = 0
+
+        # Create campaigns for each gym
+        for gym in sorted(gyms_in_term):
+            print(f"\n   🏢 Creating {gym} campaigns...")
+
+            # Filter events for this gym
+            gym_events = []
+            for event in term_events:
+                event_gym = event.get('Gym', 'SE')
+                if event_gym == gym or event_gym == 'Both':
+                    gym_events.append(event)
+
+            if not gym_events:
+                continue
+
+            # Create generator for this gym
+            generator = CampaignGenerator(term_name, gym_events, gym=gym)
+
+            # Create term-start campaign
+            term_campaign = generator.create_term_start_campaign()
+            campaign_id = zoho_client.create_campaign_draft(term_campaign)
             if campaign_id:
-                created_count += 1
-                # Extract reminder date from campaign dict
-                reminder_date_str = reminder.get('reminder_date', '')
-                if reminder_date_str:
-                    try:
-                        schedule_date = datetime.strptime(reminder_date_str, '%Y-%m-%d')
-                        campaigns_to_schedule.append({
-                            'id': campaign_id,
-                            'name': reminder['name'],
-                            'send_date': schedule_date
-                        })
-                    except ValueError:
-                        pass
+                print(f"      ✅ Created term campaign: {term_campaign['name']}")
+                # Schedule for day before term starts
+                schedule_date = term_start - timedelta(days=1)
+                campaigns_to_schedule.append({
+                    'id': campaign_id,
+                    'name': term_campaign['name'],
+                    'send_date': schedule_date
+                })
 
-        print(f"✅ Created {created_count}/{len(reminder_campaigns)} reminder campaigns")
+            # Create reminder campaigns
+            reminder_campaigns = generator.create_reminder_campaigns()
+            created_count = 0
+            for reminder in reminder_campaigns:
+                campaign_id = zoho_client.create_campaign_draft(reminder)
+                if campaign_id:
+                    created_count += 1
+                    # Extract reminder date from campaign dict
+                    reminder_date_str = reminder.get('reminder_date', '')
+                    if reminder_date_str:
+                        try:
+                            schedule_date = datetime.strptime(reminder_date_str, '%Y-%m-%d')
+                            campaigns_to_schedule.append({
+                                'id': campaign_id,
+                                'name': reminder['name'],
+                                'send_date': schedule_date
+                            })
+                        except ValueError:
+                            pass
+
+            total_reminder_count += created_count
+            print(f"      ✅ Created {created_count}/{len(reminder_campaigns)} {gym} reminder campaigns")
 
         # Step 7: Schedule all campaigns
         print("\n📅 Scheduling campaigns...")
@@ -381,18 +412,20 @@ def main():
     print("✅ SKILL COMPLETED SUCCESSFULLY")
     print("="*70)
     print(f"\nCreated campaigns for: {term_name}")
-    print(f"Total campaigns: {len(campaigns_to_schedule)} (1 term overview + {created_count} reminders)")
+    print(f"Gyms: {', '.join(sorted(gyms_in_term))}")
+    print(f"Total campaigns: {len(campaigns_to_schedule)} ({len(gyms_in_term)} term overview + {total_reminder_count} reminders)")
     print(f"✅ All campaigns have been scheduled for automatic sending!")
     print("\n📌 Next steps (optional):")
-    print("   If you want the Shire Elite logo to display in emails:")
+    print("   If you want gym logos to display in emails:")
     print("   1. Log into Zoho Campaigns")
     print("   2. For EACH campaign draft:")
     print("      • Open the campaign")
     print("      • Click 'Create Content'")
-    print("      • Copy and paste the master template HTML")
-    print("      • (The Shire Elite logo will display automatically)")
+    print("      • Copy and paste the appropriate master template HTML:")
+    print("        - Shire Elite: master_template.html")
+    print("        - SCA Allstars: master_template_sca.html")
+    print("      • (The gym logo will display automatically)")
     print("\n   Otherwise, campaigns will send with content from the auto-generated HTML.")
-    print("\n   💡 Tip: The master template HTML is in: master_template.html")
     print("\n")
 
 
