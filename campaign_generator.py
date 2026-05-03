@@ -118,7 +118,7 @@ def ensure_campaigns_dir():
     os.makedirs(CAMPAIGNS_DIR, exist_ok=True)
 
 
-def truncate_filename_for_url(filename: str, max_url_length: int = 150) -> str:
+def truncate_filename_for_url(filename: str, max_url_length: int = 200) -> str:
     """
     Truncate filename to keep the final URL under a character limit.
 
@@ -128,7 +128,7 @@ def truncate_filename_for_url(filename: str, max_url_length: int = 150) -> str:
 
     Args:
         filename: Original filename (e.g., "reminder-term-3-ends-competitive-programs-20260929.html")
-        max_url_length: Maximum URL length (default 150 characters)
+        max_url_length: Maximum URL length (default 200 characters)
 
     Returns:
         Shortened filename
@@ -240,7 +240,7 @@ def sanitize_filename(filename: str) -> str:
 class CampaignGenerator:
     """Generates campaign content for a gym term using master template approach."""
 
-    def __init__(self, term_name: str, events: List[Dict], gym: str = 'SE', use_master_template: bool = True):
+    def __init__(self, term_name: str, events: List[Dict], gym: str = 'SE', use_master_template: bool = True, all_events: Optional[List[Dict]] = None):
         """
         Initialize the generator.
 
@@ -250,9 +250,11 @@ class CampaignGenerator:
             gym: Gym name ('SE' for Shire Elite, 'SCA' for SCA Allstars)
             use_master_template: If True, use master template (recommended).
                                 If False, fall back to GitHub Pages HTML generation.
+            all_events: List of ALL events (for finding next term dates). If None, uses just current term events.
         """
         self.term_name = term_name
         self.events = events
+        self.all_events = all_events if all_events else events  # Use all_events for lookups, fallback to just term events
         self.gym = gym
         self.use_master_template = use_master_template
         self.master_template_html = None
@@ -271,6 +273,47 @@ class CampaignGenerator:
                 print(f"⚠️  Could not load master template: {e}")
                 print("   Falling back to GitHub Pages approach")
                 self.use_master_template = False
+
+    def _load_generic_template(self, category: str) -> str:
+        """
+        Load a generic category template for the current gym.
+
+        Generic templates are stored in /docs/templates/TEMPLATE-{GYM}-{CATEGORY}.html
+
+        Args:
+            category: Category name (FEES, CHEER_CLINICS, GYM_CLOSURE, CATCHUP, OTHER_IMPORTANT_DATES)
+
+        Returns:
+            Template HTML content as string, or raises FileNotFoundError if not found
+        """
+        # Map category to template name
+        category_map = {
+            'FEES': 'FEES',
+            'CHEER_CLINICS': 'CHEER-CLINICS',
+            'GYM_CLOSURE': 'GYM-CLOSURE',
+            'CATCHUP': 'CATCHUP',
+            'OTHER_IMPORTANT_DATES': 'OTHER-IMPORTANT-DATES',
+        }
+
+        if category not in category_map:
+            raise ValueError(f"Unknown category: {category}")
+
+        template_name = category_map[category]
+        template_path = os.path.join(
+            os.path.dirname(__file__),
+            'docs', 'templates',
+            f'TEMPLATE-{self.gym}-{template_name}.html'
+        )
+
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(f"Generic template not found: {template_path}")
+
+        try:
+            with open(template_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            print(f"❌ Failed to load generic template: {e}")
+            raise
 
     def _save_html_and_get_url(self, html_content: str, filename: str) -> str:
         """
@@ -315,7 +358,7 @@ class CampaignGenerator:
         if not self.events:
             return {}
 
-        campaign_name = f"{self.term_name} - What's Coming Up"
+        campaign_name = f"{self.gym} {self.term_name} - What's Coming Up"
 
         # Exclude holiday clinic events from the overview
         # (they get their own grouped campaign)
@@ -360,7 +403,7 @@ class CampaignGenerator:
             )
             # Save to GitHub Pages so Zoho can access it
             safe_term_name = sanitize_filename(self.term_name.lower().replace(' ', '-'))
-            filename = f"term-overview-{safe_term_name}.html"
+            filename = f"term-overview-{self.gym.lower()}-{safe_term_name}.html"
             content_url = self._save_html_and_get_url(html_body, filename)
         else:
             # Fallback to GitHub approach
@@ -373,7 +416,7 @@ class CampaignGenerator:
                 logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
             )
             safe_term_name = sanitize_filename(self.term_name.lower().replace(' ', '-'))
-            filename = f"term-overview-{safe_term_name}.html"
+            filename = f"term-overview-{self.gym.lower()}-{safe_term_name}.html"
             content_url = self._save_html_and_get_url(html_body, filename)
 
         return {
@@ -386,15 +429,293 @@ class CampaignGenerator:
             'target_gym': self.gym
         }
 
+    # ============================================================================
+    # CATEGORY DETECTION METHODS
+    # ============================================================================
+
+    def _detect_event_category(self, event: Dict) -> str:
+        """
+        Detect the category of an event.
+
+        Returns one of:
+        - 'TERM_BEGIN': Term begins events
+        - 'TERM_END': Term ends events
+        - 'FEES': Important Dates > Fees
+        - 'CHEER_CLINICS': Cheer Clinics (all are holiday/school-break related)
+        - 'OTHER_IMPORTANT_DATES': Important Dates > Other
+        - 'GYM_CLOSURE': Gym Closure events (non-school-holiday)
+        - 'CATCHUP': Catch-Up sessions
+        - 'EVENTS': Regular events (to skip)
+        - 'UNKNOWN': Could not determine
+        """
+        event_name = event.get('Event Name', '').lower()
+        event_type = event.get('Event Type', '').strip().lower()
+
+        # Check for TERM events first
+        if 'terms' in event_type:
+            if 'begin' in event_name and 'end' not in event_name:
+                return 'TERM_BEGIN'
+            elif 'end' in event_name:
+                return 'TERM_END'
+
+        # Check for IMPORTANT DATES subcategories
+        if 'important' in event_type or 'important dates' in event_type:
+            if self._is_fees_event(event):
+                return 'FEES'
+            elif self._is_cheer_clinic(event.get('Event Name', '')):
+                return 'CHEER_CLINICS'
+            else:
+                return 'OTHER_IMPORTANT_DATES'
+
+        # Check for GYM CLOSURES
+        if 'gym' in event_type or 'closure' in event_type:
+            if self._is_catchup_event(event.get('Event Name', '')):
+                return 'CATCHUP'
+            elif self._is_school_holiday_closure(event.get('Event Name', '')):
+                return 'SKIP'  # Skip school holiday closures
+            else:
+                return 'GYM_CLOSURE'
+
+        # Check for regular EVENTS (to skip)
+        if 'events' in event_type:
+            return 'EVENTS'
+
+        return 'UNKNOWN'
+
+    def _is_fees_event(self, event: Dict) -> bool:
+        """Check if an Important Dates event is about fees."""
+        event_name = event.get('Event Name', '').lower()
+        return any(keyword in event_name for keyword in ['fee', 'payment', 'cost', 'invoice', 'registration'])
+
+    def _is_cheer_clinic(self, event_name: str) -> bool:
+        """Check if an event is a cheer clinic (all are holiday/school-break related)."""
+        return 'cheer clinic' in event_name.lower()
+
+    def _is_school_holiday_closure(self, event_name: str) -> bool:
+        """Check if a gym closure is due to school holidays."""
+        lower_name = event_name.lower()
+        return any(keyword in lower_name for keyword in ['school hol', 'school holidays', 'public holiday'])
+
+    def _is_catchup_event(self, event_name: str) -> bool:
+        """Check if an event is a catch-up session."""
+        lower_name = event_name.lower()
+        return 'catch-up' in lower_name or 'catch up' in lower_name
+
+    # ============================================================================
+    # NEW CAMPAIGN BUILDER METHODS FOR EACH CATEGORY
+    # ============================================================================
+
+    def _build_fees_campaign(self, event: Dict, reminder_date: datetime) -> Dict:
+        """Build a campaign for a fees/payment event using generic FEES template."""
+        event_name = event.get('Event Name', '')
+        event_date_str = event.get('Date', '')
+
+        event_name_clean = event_name.replace('–', '-').replace('—', '-')
+        campaign_name = f"{self.gym} {event_name_clean} - 3 Day Reminder"
+        subject = f"💳 {event_name} - 3 Day Reminder"
+
+        # Build specific body content for this event (no <p> tags - template provides them)
+        body_content = f"<strong>📅 Due Date:</strong> {event_date_str}"
+
+        # Load generic FEES template and replace placeholders
+        try:
+            generic_template = self._load_generic_template('FEES')
+            html_body = replace_template_placeholders(
+                generic_template,
+                heading=event_name,
+                body=body_content
+            )
+        except FileNotFoundError:
+            # Fallback to master template if generic template not found
+            if self.use_master_template and self.master_template_html:
+                html_body = replace_template_placeholders(
+                    self.master_template_html,
+                    heading=event_name,
+                    body=body_content
+                )
+            else:
+                raise
+
+        safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
+        filename = f"reminder-{self.gym.lower()}-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+        filename = truncate_filename_for_url(filename)
+        content_url = self._save_html_and_get_url(html_body, filename)
+
+        return {
+            'name': campaign_name,
+            'subject': subject,
+            'html_body': None,
+            'content_url': content_url,
+            'from_name': self._get_gym_from_name(),
+            'type': 'reminder',
+            'event_name': event_name,
+            'reminder_date': reminder_date.strftime('%Y-%m-%d'),
+            'target_gym': self.gym,
+            'category': 'FEES'
+        }
+
+    def _build_other_important_dates_campaign(self, event: Dict, reminder_date: datetime) -> Dict:
+        """Build a campaign for other important dates using generic OTHER-IMPORTANT-DATES template."""
+        event_name = event.get('Event Name', '')
+        event_date_str = event.get('Date', '')
+
+        event_name_clean = event_name.replace('–', '-').replace('—', '-')
+        campaign_name = f"{self.gym} {event_name_clean} - 3 Day Reminder"
+        subject = f"⚠️ {event_name} - 3 Day Reminder"
+
+        # Build specific body content for this event (no <p> tags - template provides them)
+        body_content = f"<strong>📅 Date:</strong> {event_date_str}"
+
+        # Load generic OTHER-IMPORTANT-DATES template and replace placeholders
+        try:
+            generic_template = self._load_generic_template('OTHER_IMPORTANT_DATES')
+            html_body = replace_template_placeholders(
+                generic_template,
+                heading=event_name,
+                body=body_content
+            )
+        except FileNotFoundError:
+            # Fallback to master template if generic template not found
+            if self.use_master_template and self.master_template_html:
+                html_body = replace_template_placeholders(
+                    self.master_template_html,
+                    heading=event_name,
+                    body=body_content
+                )
+            else:
+                raise
+
+        safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
+        filename = f"reminder-{self.gym.lower()}-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+        filename = truncate_filename_for_url(filename)
+        content_url = self._save_html_and_get_url(html_body, filename)
+
+        return {
+            'name': campaign_name,
+            'subject': subject,
+            'html_body': None,
+            'content_url': content_url,
+            'from_name': self._get_gym_from_name(),
+            'type': 'reminder',
+            'event_name': event_name,
+            'reminder_date': reminder_date.strftime('%Y-%m-%d'),
+            'target_gym': self.gym,
+            'category': 'OTHER_IMPORTANT_DATES'
+        }
+
+    def _build_gym_closure_campaign(self, event: Dict, reminder_date: datetime) -> Dict:
+        """Build a campaign for a gym closure event using generic GYM-CLOSURE template."""
+        event_name = event.get('Event Name', '')
+        event_date_str = event.get('Date', '')
+
+        event_name_clean = event_name.replace('–', '-').replace('—', '-')
+        campaign_name = f"{self.gym} {event_name_clean} - 3 Day Reminder"
+        subject = f"🔒 {event_name} - 3 Day Reminder"
+
+        # Build specific body content for this event (no <p> tags - template provides them)
+        body_content = f"<strong>📅 Closure Period:</strong> {event_date_str}"
+
+        # Load generic GYM-CLOSURE template and replace placeholders
+        try:
+            generic_template = self._load_generic_template('GYM_CLOSURE')
+            html_body = replace_template_placeholders(
+                generic_template,
+                heading=event_name,
+                body=body_content
+            )
+        except FileNotFoundError:
+            # Fallback to master template if generic template not found
+            if self.use_master_template and self.master_template_html:
+                html_body = replace_template_placeholders(
+                    self.master_template_html,
+                    heading=event_name,
+                    body=body_content
+                )
+            else:
+                raise
+
+        safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
+        filename = f"reminder-{self.gym.lower()}-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+        filename = truncate_filename_for_url(filename)
+        content_url = self._save_html_and_get_url(html_body, filename)
+
+        return {
+            'name': campaign_name,
+            'subject': subject,
+            'html_body': None,
+            'content_url': content_url,
+            'from_name': self._get_gym_from_name(),
+            'type': 'reminder',
+            'event_name': event_name,
+            'reminder_date': reminder_date.strftime('%Y-%m-%d'),
+            'target_gym': self.gym,
+            'category': 'GYM_CLOSURE'
+        }
+
+    def _build_catchup_campaign(self, event: Dict, reminder_date: datetime) -> Dict:
+        """Build a campaign for a catch-up session using generic CATCHUP template."""
+        event_name = event.get('Event Name', '')
+        event_date_str = event.get('Date', '')
+
+        event_name_clean = event_name.replace('–', '-').replace('—', '-')
+        campaign_name = f"{self.gym} {event_name_clean} - 3 Day Reminder"
+        subject = f"⚡ {event_name} - 3 Day Reminder"
+
+        # Build specific body content for this event (no <p> tags - template provides them)
+        body_content = f"<strong>📅 Date:</strong> {event_date_str}"
+
+        # Load generic CATCHUP template and replace placeholders
+        try:
+            generic_template = self._load_generic_template('CATCHUP')
+            html_body = replace_template_placeholders(
+                generic_template,
+                heading=event_name,
+                body=body_content
+            )
+        except FileNotFoundError:
+            # Fallback to master template if generic template not found
+            if self.use_master_template and self.master_template_html:
+                html_body = replace_template_placeholders(
+                    self.master_template_html,
+                    heading=event_name,
+                    body=body_content
+                )
+            else:
+                raise
+
+        safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
+        filename = f"reminder-{self.gym.lower()}-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+        filename = truncate_filename_for_url(filename)
+        content_url = self._save_html_and_get_url(html_body, filename)
+
+        return {
+            'name': campaign_name,
+            'subject': subject,
+            'html_body': None,
+            'content_url': content_url,
+            'from_name': self._get_gym_from_name(),
+            'type': 'reminder',
+            'event_name': event_name,
+            'reminder_date': reminder_date.strftime('%Y-%m-%d'),
+            'target_gym': self.gym,
+            'category': 'CATCHUP'
+        }
+
     def create_reminder_campaigns(self) -> List[Dict]:
         """
         Create reminder campaigns for 3 days before each event.
 
-        Handles:
-        - Regular events (individual reminders)
-        - Gym closures (individual reminders)
-        - Holiday clinics (grouped by holiday period)
-        - Term ends + Gym closures (grouped together when related)
+        Uses category detection to route events to appropriate campaign builders:
+        - TERM_BEGIN: Skipped (covered in term overview)
+        - TERM_END: Grouped by term, one campaign per term with all programs
+        - FEES: Individual campaign with fees content
+        - CHEER_CLINICS: Individual campaign with clinic content
+        - OTHER_IMPORTANT_DATES: Individual campaign with important date content
+        - HOLIDAY_CLINICS: Grouped by holiday period
+        - GYM_CLOSURE: Individual campaign with closure content
+        - CATCHUP: Individual campaign with catchup content
+        - EVENTS: Skipped entirely
+        - SKIP/UNKNOWN: Skipped
 
         Returns:
             List of campaign dicts ready for Zoho API
@@ -402,56 +723,88 @@ class CampaignGenerator:
         campaigns = []
         processed_events = set()  # Track which events we've processed
         holiday_clinic_groups = {}  # Group clinics by holiday period
-        term_end_events = []  # Collect term end events for grouping with closures
+        term_end_groups = {}  # Group term end events by term name
 
         print(f"    📊 Processing {len(self.events)} events for reminders...")
 
-        # First pass: group holiday clinics by holiday period and collect term end events
+        # First pass: detect categories and group events that need grouping
         for event in self.events:
             event_name = event.get('Event Name', '')
-            event_type = event.get('Event Type', '').strip().lower()
+            category = self._detect_event_category(event)
 
-            if self._is_holiday_clinic(event_name):
+            # Group cheer clinics by period
+            if category == 'CHEER_CLINICS':
                 holiday_period = self._extract_holiday_period(event_name)
                 if holiday_period not in holiday_clinic_groups:
                     holiday_clinic_groups[holiday_period] = []
                 holiday_clinic_groups[holiday_period].append(event)
-            elif 'term' in event_name.lower() and 'end' in event_name.lower():
-                # Collect term end events for potential grouping with gym closures
-                term_end_events.append(event)
 
-        # Second pass: create campaigns
+            # Group term ends by term name
+            elif category == 'TERM_END':
+                import re
+                term_base = re.split(r'\s+[-–]\s+', event_name)[0]  # e.g., "Term 3 ends"
+                if term_base not in term_end_groups:
+                    term_end_groups[term_base] = []
+                term_end_groups[term_base].append(event)
+
+        # Second pass: create campaigns using category-based routing
         for idx, event in enumerate(self.events):
             event_name = event.get('Event Name', '')
-            event_type = event.get('Event Type', '').strip().lower()
             event_date_str = event.get('Date', '')
-            event_id = f"{event_name}_{event_date_str}"  # Unique identifier
+            event_id = f"{event_name}_{event_date_str}"
 
-            # Skip if already processed (as part of a group)
+            # Skip if already processed as part of a group
             if event_id in processed_events:
                 continue
 
-            # Skip "Term begins" events (they're covered in the term overview email)
-            # But INCLUDE "Term ends" and "Gym closure" events
-            if 'terms' in event_type and 'begin' in event_name.lower() and 'end' not in event_name.lower():
-                print(f"    ⏭️  Event {idx+1}: Skipping '{event_name}' (covered in term overview)")
-                continue
-
+            # Parse date
             try:
                 event_date = self._parse_date(event_date_str)
-            except ValueError as e:
+            except ValueError:
                 print(f"    ❌ Event {idx+1}: Skipping '{event_name}' (invalid date '{event_date_str}')")
                 continue
 
             # Calculate reminder date (3 days before)
             reminder_date = event_date - timedelta(days=3)
 
-            # Handle holiday clinics as a group
-            if self._is_holiday_clinic(event_name):
+            # Detect category and route to appropriate handler
+            category = self._detect_event_category(event)
+
+            if category == 'TERM_BEGIN':
+                # Skip - covered in term overview email
+                print(f"    ⏭️  Event {idx+1}: Skipping '{event_name}' (covered in term overview)")
+                processed_events.add(event_id)
+
+            elif category == 'TERM_END':
+                # Process grouped term end campaign
+                import re
+                term_base = re.split(r'\s+[-–]\s+', event_name)[0]
+                if term_base in term_end_groups:
+                    term_ends_for_term = term_end_groups[term_base]
+                    campaign = self._build_grouped_term_end_campaign(
+                        term_ends_for_term,
+                        reminder_date
+                    )
+                    if campaign:
+                        campaigns.append(campaign)
+                        for term_event in term_ends_for_term:
+                            processed_events.add(f"{term_event.get('Event Name', '')}_{term_event.get('Date', '')}")
+                        print(f"    ✅ Grouped: {len(term_ends_for_term)} programs in '{term_base}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+                    del term_end_groups[term_base]
+
+            elif category == 'FEES':
+                # Build fees campaign
+                campaign = self._build_fees_campaign(event, reminder_date)
+                if campaign:
+                    campaigns.append(campaign)
+                    processed_events.add(event_id)
+                    print(f"    ✅ Event {idx+1}: FEES - '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+
+            elif category == 'CHEER_CLINICS':
+                # Process grouped cheer clinics campaign (all are holiday/school-break related)
                 holiday_period = self._extract_holiday_period(event_name)
                 if holiday_period in holiday_clinic_groups:
-                    # Create one campaign for all clinics in this period
-                    campaign = self._build_holiday_clinic_campaign(
+                    campaign = self._build_cheer_clinics_campaign(
                         holiday_period,
                         holiday_clinic_groups[holiday_period],
                         reminder_date
@@ -459,30 +812,48 @@ class CampaignGenerator:
                     if campaign:
                         campaigns.append(campaign)
                         for clinic_event in holiday_clinic_groups[holiday_period]:
-                            processed_events.add(f"{clinic_event.get('Event Name', '')}{clinic_event.get('Date', '')}")
-                        print(f"    ✅ Grouped: '{holiday_period}' clinics → reminder on {reminder_date.strftime('%Y-%m-%d')}")
-                    # Remove from dict so we don't process it again
+                            processed_events.add(f"{clinic_event.get('Event Name', '')}_{clinic_event.get('Date', '')}")
+                        print(f"    ✅ Grouped: '{holiday_period}' cheer clinics → reminder on {reminder_date.strftime('%Y-%m-%d')}")
                     del holiday_clinic_groups[holiday_period]
-            # Skip gym closure events entirely (not needed - athletes figure them out from gaps)
-            elif 'gym' in event_name.lower() and 'closure' in event_name.lower():
+
+            elif category == 'OTHER_IMPORTANT_DATES':
+                # Build other important dates campaign
+                campaign = self._build_other_important_dates_campaign(event, reminder_date)
+                if campaign:
+                    campaigns.append(campaign)
+                    processed_events.add(event_id)
+                    print(f"    ✅ Event {idx+1}: OTHER_IMPORTANT_DATES - '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+
+            elif category == 'GYM_CLOSURE':
+                # Build gym closure campaign
+                campaign = self._build_gym_closure_campaign(event, reminder_date)
+                if campaign:
+                    campaigns.append(campaign)
+                    processed_events.add(event_id)
+                    print(f"    ✅ Event {idx+1}: GYM_CLOSURE - '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+
+            elif category == 'CATCHUP':
+                # Build catch-up campaign
+                campaign = self._build_catchup_campaign(event, reminder_date)
+                if campaign:
+                    campaigns.append(campaign)
+                    processed_events.add(event_id)
+                    print(f"    ✅ Event {idx+1}: CATCHUP - '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+
+            elif category == 'EVENTS':
+                # Skip regular events
+                print(f"    ⏭️  Event {idx+1}: Skipping '{event_name}' (Events category - no campaigns needed)")
                 processed_events.add(event_id)
-                # No campaign created for gym closures
-                continue
-            # Handle Term ends
-            elif 'term' in event_name.lower() and 'end' in event_name.lower():
-                # Create term end campaign (includes next term date)
-                campaign = self._build_term_end_campaign(event, reminder_date)
-                if campaign:
-                    campaigns.append(campaign)
-                    processed_events.add(event_id)
-                    print(f"    ✅ Event {idx+1}: '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+
+            elif category == 'SKIP':
+                # Skip school holiday closures
+                print(f"    ⏭️  Event {idx+1}: Skipping '{event_name}' (school holiday closure)")
+                processed_events.add(event_id)
+
             else:
-                # Regular event
-                campaign = self._build_reminder_campaign(event, reminder_date)
-                if campaign:
-                    campaigns.append(campaign)
-                    processed_events.add(event_id)
-                    print(f"    ✅ Event {idx+1}: '{event_name}' → reminder on {reminder_date.strftime('%Y-%m-%d')}")
+                # Unknown category
+                print(f"    ⚠️  Event {idx+1}: Skipping '{event_name}' (unknown category: {category})")
+                processed_events.add(event_id)
 
         print(f"    📋 Created {len(campaigns)} reminder campaigns from {len(self.events)} events")
         return campaigns
@@ -501,6 +872,22 @@ class CampaignGenerator:
             return match.group(1).strip()
         return event_name
 
+    def _extract_term_number(self, text: str) -> Optional[str]:
+        """
+        Extract term number from text (e.g., "2" from "Term 2 ends" or "Term 2 End Date: Fri 25 Sep").
+
+        Args:
+            text: Text containing term reference
+
+        Returns:
+            Term number as string (e.g., "2"), or None if not found
+        """
+        import re
+        match = re.search(r'Term\s+(\d+)', text)
+        if match:
+            return match.group(1)
+        return None
+
     def _build_reminder_campaign(self, event: Dict, reminder_date: datetime) -> Dict:
         """Build a single reminder campaign."""
         event_name = event.get('Event Name', '')
@@ -509,7 +896,7 @@ class CampaignGenerator:
 
         # Campaign name - replace em-dashes with regular hyphens to avoid Zoho import errors
         event_name_clean = event_name.replace('–', '-').replace('—', '-')
-        campaign_name = f"{event_name_clean} - 3 Day Reminder"
+        campaign_name = f"{self.gym} {event_name_clean} - 3 Day Reminder"
 
         # Build email content based on event type
         subject = f"⏰ {event_name} - 3 Day Reminder"
@@ -524,7 +911,7 @@ class CampaignGenerator:
             )
             # Save to GitHub Pages so Zoho can access it
             safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
-            filename = f"reminder-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+            filename = f"reminder-{self.gym.lower()}-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
             # Truncate filename to keep URL under Zoho's limit
             filename = truncate_filename_for_url(filename)
             content_url = self._save_html_and_get_url(html_body, filename)
@@ -539,7 +926,7 @@ class CampaignGenerator:
                 logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
             )
             safe_event_name = sanitize_filename(event_name.lower().replace(' ', '-'))
-            filename = f"reminder-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+            filename = f"reminder-{self.gym.lower()}-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
             # Truncate filename to keep URL under Zoho's limit
             filename = truncate_filename_for_url(filename)
             content_url = self._save_html_and_get_url(html_body, filename)
@@ -556,55 +943,51 @@ class CampaignGenerator:
             'target_gym': self.gym
         }
 
-    def _build_holiday_clinic_campaign(self, holiday_period: str, clinic_events: List[Dict], reminder_date: datetime) -> Dict:
-        """Build a campaign for grouped holiday clinics (e.g., all Winter Hols clinics together)."""
+    def _build_cheer_clinics_campaign(self, holiday_period: str, clinic_events: List[Dict], reminder_date: datetime) -> Dict:
+        """Build a campaign for grouped cheer clinics using generic CHEER-CLINICS template."""
         # Combine dates from all clinic events (for email body)
         clinic_dates = [e.get('Date', '') for e in clinic_events]
         combined_dates = " / ".join(clinic_dates)
 
         # Simplified campaign name (for Zoho API - remove em-dashes to avoid import errors)
         holiday_period_clean = holiday_period.replace('–', '-').replace('—', '-')
-        campaign_name = f"Holiday Clinics - {holiday_period_clean}"
+        campaign_name = f"Cheer Clinics - {holiday_period_clean}"
 
-        # Build email content for holiday clinics
+        # Build email content for cheer clinics
         subject = f"🎉 Cheer Clinics – {holiday_period}"
         heading = f"Cheer Clinics – {holiday_period}"
-        body_content = f"""<p>Join us for exciting cheer clinics during the {holiday_period} holiday break!</p>
-<p><strong>📅 Dates:</strong> {combined_dates}</p>
-<p>Perfect opportunity to improve your skills, meet other cheerleaders, and have fun!</p>
-<p>Limited spots available – register early to secure your place.</p>"""
 
-        # Use master template if available
-        if self.use_master_template and self.master_template_html:
+        # Build specific body content with clinic dates (no <p> tags - template provides them)
+        body_content = f"<strong>📅 Dates:</strong> {combined_dates}"
+
+        # Load generic CHEER-CLINICS template and replace placeholders
+        try:
+            generic_template = self._load_generic_template('CHEER_CLINICS')
             html_body = replace_template_placeholders(
-                self.master_template_html,
+                generic_template,
                 heading=heading,
                 body=body_content
             )
-            # Save to GitHub Pages so Zoho can access it
-            safe_period = sanitize_filename(holiday_period.lower().replace(' ', '-'))
-            filename = f"reminder-holiday-clinics-{safe_period}-{reminder_date.strftime('%Y%m%d')}.html"
-            # Truncate filename to keep URL under Zoho's limit
-            filename = truncate_filename_for_url(filename)
-            content_url = self._save_html_and_get_url(html_body, filename)
-        else:
-            # Fallback to GitHub approach
-            from brand_templates import ShireEliteTemplate
-            html_body = ShireEliteTemplate.render(
-                event_title=heading,
-                main_content=body_content,
-                button_text="Register Now",
-                button_url="https://www.shireelite.com.au/athletes",
-                logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
-            )
-            safe_period = sanitize_filename(holiday_period.lower().replace(' ', '-'))
-            filename = f"reminder-holiday-clinics-{safe_period}-{reminder_date.strftime('%Y%m%d')}.html"
-            # Truncate filename to keep URL under Zoho's limit
-            filename = truncate_filename_for_url(filename)
-            content_url = self._save_html_and_get_url(html_body, filename)
+        except FileNotFoundError:
+            # Fallback to master template if generic template not found
+            if self.use_master_template and self.master_template_html:
+                html_body = replace_template_placeholders(
+                    self.master_template_html,
+                    heading=heading,
+                    body=body_content
+                )
+            else:
+                raise
+
+        # Save to GitHub Pages so Zoho can access it
+        safe_period = sanitize_filename(holiday_period.lower().replace(' ', '-'))
+        filename = f"reminder-{self.gym.lower()}-cheer-clinics-{safe_period}-{reminder_date.strftime('%Y%m%d')}.html"
+        # Truncate filename to keep URL under Zoho's limit
+        filename = truncate_filename_for_url(filename)
+        content_url = self._save_html_and_get_url(html_body, filename)
 
         return {
-            'name': f"{campaign_name} - 3 Day Reminder",
+            'name': f"{self.gym} {campaign_name} - 3 Day Reminder",
             'subject': subject,
             'html_body': None,
             'content_url': content_url,
@@ -612,7 +995,8 @@ class CampaignGenerator:
             'type': 'reminder',
             'event_name': campaign_name,
             'reminder_date': reminder_date.strftime('%Y-%m-%d'),
-            'target_gym': self.gym
+            'target_gym': self.gym,
+            'category': 'CHEER_CLINICS'
         }
 
     def _build_event_content(self, event_type: str, event_name: str, event_date_str: str, event: Dict) -> str:
@@ -755,10 +1139,11 @@ class CampaignGenerator:
             return None
 
         # Look for "Term X begins" or similar events that come after this term end
+        # Search through all_events (which includes future terms) not just current term
         next_term = None
         min_days_after = float('inf')
 
-        for event in self.events:
+        for event in self.all_events:
             event_name_lower = event.get('Event Name', '').lower()
             event_type_lower = event.get('Event Type', '').lower()
 
@@ -777,6 +1162,127 @@ class CampaignGenerator:
                     continue
 
         return next_term
+
+    def _build_grouped_term_end_campaign(self, term_end_events: List[Dict], reminder_date: datetime) -> Dict:
+        """
+        Build ONE campaign that groups all programs for a term (e.g., Recreational + Competitive).
+
+        Shows all programs with their individual end dates, plus when the next term begins.
+        Handles cases where different programs end on different dates.
+
+        Args:
+            term_end_events: List of term end events for this term (may have different dates)
+            reminder_date: When to send the reminder
+
+        Returns:
+            Campaign dict ready for Zoho API
+        """
+        if not term_end_events:
+            return {}
+
+        # Find next term start date (use first event as reference)
+        next_term_date = self._find_next_term_start_date(term_end_events[0])
+        next_term_number = self._extract_term_number(next_term_date) if next_term_date else None
+
+        # Build campaign name showing this is about term endings
+        # Extract term base (e.g., "Term 3 ends")
+        # Handle both regular hyphen (-) and en-dash (–)
+        import re
+        first_event = term_end_events[0].get('Event Name', '')
+        campaign_name_base = re.split(r'\s+[-–]\s+', first_event)[0].replace('–', '-').replace('—', '-')
+
+        # Extract term number (e.g., "3" from "Term 3 ends")
+        current_term_number = self._extract_term_number(campaign_name_base)
+
+        subject = f"⏰ {campaign_name_base} - 3 Day Reminder"
+
+        # Build email content listing all programs with their individual end dates
+        # NOTE: Do NOT wrap in <p> tags - the template's placeholder already does this
+        # Avoid nested <p> tags by using <br> for line breaks instead
+        body_sections = []
+
+        # Check if all programs end on the same date
+        unique_dates = set(e.get('Date', '') for e in term_end_events)
+        all_same_date = len(unique_dates) == 1
+
+        if all_same_date:
+            # All programs end on same date - simpler format with term number
+            term_date = term_end_events[0].get('Date', '')
+            if current_term_number:
+                body_sections.append(f"<strong>Term {current_term_number} End Date:</strong> {term_date}")
+            else:
+                body_sections.append(f"<strong>Term End Date:</strong> {term_date}")
+        else:
+            # Multiple programs with different end dates - show all with who they're for
+            heading = f"<strong>Term {current_term_number} End Dates:</strong>" if current_term_number else "<strong>End Dates:</strong>"
+            list_items = []
+            for event in term_end_events:
+                event_name = event.get('Event Name', '').replace('–', '-').replace('—', '-')
+                event_date = event.get('Date', '')
+                # Extract the program type (e.g., "Recreational programs" from "Term 3 ends - Recreational programs")
+                if ' - ' in event_name:
+                    program_type = event_name.split(' - ', 1)[1]
+                else:
+                    program_type = event_name
+                list_items.append(f"<li>{program_type}: {event_date}</li>")
+
+            # Combine heading with list
+            ul_content = "<ul>" + "".join(list_items) + "</ul>"
+            body_sections.append(heading)
+            body_sections.append(ul_content)
+
+        if next_term_date:
+            if next_term_number:
+                body_sections.append(f"<strong>Term {next_term_number} Resumes:</strong> {next_term_date}")
+            else:
+                body_sections.append(f"<strong>Term Resumes:</strong> {next_term_date}")
+
+        body_sections.append("Please note these important dates for your gym schedule.")
+        body_sections.append("Thanks!<br>Your Gym Team")
+
+        # Join with <br> to separate sections, avoiding <br> inside list
+        body_content = "<br>".join(body_sections)
+
+        # Use master template if available
+        if self.use_master_template and self.master_template_html:
+            html_body = replace_template_placeholders(
+                self.master_template_html,
+                heading=campaign_name_base,
+                body=body_content
+            )
+            # Save to GitHub Pages so Zoho can access it
+            safe_event_name = sanitize_filename(campaign_name_base.lower().replace(' ', '-'))
+            filename = f"reminder-{self.gym.lower()}-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+            # Truncate filename to keep URL under Zoho's limit
+            filename = truncate_filename_for_url(filename)
+            content_url = self._save_html_and_get_url(html_body, filename)
+        else:
+            # Fallback
+            from brand_templates import ShireEliteTemplate
+            html_body = ShireEliteTemplate.render(
+                event_title=campaign_name_base,
+                main_content=body_content,
+                button_text="Athletes Page",
+                button_url="https://www.shireelite.com.au/athletes",
+                logo_url="https://laura-shireelite.github.io/season-calendar-zoho-campaigns/images/shire-elite-logo-email.png"
+            )
+            safe_event_name = sanitize_filename(campaign_name_base.lower().replace(' ', '-'))
+            filename = f"reminder-{self.gym.lower()}-{safe_event_name}-{reminder_date.strftime('%Y%m%d')}.html"
+            # Truncate filename to keep URL under Zoho's limit
+            filename = truncate_filename_for_url(filename)
+            content_url = self._save_html_and_get_url(html_body, filename)
+
+        return {
+            'name': f"{self.gym} {campaign_name_base} - 3 Day Reminder",
+            'subject': subject,
+            'html_body': None,
+            'content_url': content_url,
+            'from_name': self._get_gym_from_name(),
+            'type': 'reminder',
+            'event_name': campaign_name_base,
+            'reminder_date': reminder_date.strftime('%Y-%m-%d'),
+            'target_gym': self.gym
+        }
 
     def _build_term_end_campaign(self, term_end_event: Dict, reminder_date: datetime) -> Dict:
         """
