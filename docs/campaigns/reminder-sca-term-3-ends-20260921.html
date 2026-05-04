@@ -4,26 +4,147 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { margin: 0; padding: 0; background: #f5f5f5; font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; }
-    .email-wrapper { width: 100%; padding: 40px 12px; background: #f5f5f5; }
-    .email-container { max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 14px; overflow: hidden; border: 1px solid #e6e6e6; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .header { padding: 32px 32px 24px; border-bottom: 1px solid #ededed; text-align: center; }
-    .content { padding: 40px 32px; font-size: 15px; line-height: 1.8; }
-    h1 { font-size: 28px; line-height: 1.3; margin: 0 0 28px; letter-spacing: -0.03em; color: #1a1a1a; }
-    p { margin: 0 0 20px; color: #1a1a1a; }
-    p:last-of-type { margin-bottom: 0; }
-    .closing-text { color: #1a1a1a; margin-top: 24px; }
-    .quick-reminder-section { text-align: center; padding: 32px 32px; background: #FFE0E6; border-top: 1px solid #FFD4DD; }
-    .quick-reminder-title { margin: 0 0 12px; font-size: 16px; line-height: 1.4; font-weight: 700; color: #1a1a1a; text-align: left; }
-    .quick-reminder-text { margin: 0; font-size: 15px; line-height: 1.6; color: #1a1a1a; text-align: left; }
-    .personalization-section { text-align: center; padding: 32px 32px; background: #f9f9f9; border-top: 1px solid #e6e6e6; font-size: 14px; line-height: 1.8; color: #1a1a1a; }
-    .personalization-section p { margin: 0 0 12px; text-align: left; }
-    .personalization-section p:last-child { margin-bottom: 0; }
-    .footer { padding: 32px; font-size: 12px; line-height: 1.8; color: #777777; border-top: 1px solid #ededed; background: #fbfbfb; }
-    .footer p { margin: 0 0 16px; }
-    .footer p:last-child { margin-bottom: 0; }
-    .footer a { color: #e91e63; text-decoration: none; }
-    .footer a:hover { text-decoration: underline; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #1a1a1a;
+    }
+
+    .email-wrapper {
+      width: 100%;
+      padding: 40px 12px;
+      background: #f5f5f5;
+    }
+
+    .email-container {
+      max-width: 640px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid #e6e6e6;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .header {
+      padding: 32px 32px 24px;
+      border-bottom: 1px solid #ededed;
+      text-align: center;
+    }
+
+    .content {
+      padding: 40px 32px;
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    h1 {
+      font-size: 28px;
+      line-height: 1.3;
+      margin: 0 0 28px;
+      letter-spacing: -0.03em;
+      color: #1a1a1a;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin: 24px 0 12px;
+      color: #1a1a1a;
+      font-weight: 700;
+    }
+
+    p {
+      margin: 0 0 20px;
+      color: #1a1a1a;
+    }
+
+    p:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .closing-text {
+      color: #1a1a1a;
+      margin-top: 24px;
+    }
+
+    .quick-reminder-section {
+      text-align: center;
+      padding: 32px 32px;
+      background: #FFE0E6;
+      border-top: 1px solid #FFD4DD;
+    }
+
+    .quick-reminder-title {
+      margin: 0 0 12px;
+      font-size: 16px;
+      line-height: 1.4;
+      font-weight: 700;
+      color: #1a1a1a;
+      text-align: left;
+    }
+
+    .quick-reminder-text {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #1a1a1a;
+      text-align: left;
+    }
+
+    .personalization-section {
+      text-align: center;
+      padding: 32px 32px;
+      background: #f9f9f9;
+      border-top: 1px solid #e6e6e6;
+      font-size: 14px;
+      line-height: 1.8;
+      color: #1a1a1a;
+    }
+
+    .personalization-section p {
+      margin: 0 0 12px;
+      text-align: left;
+    }
+
+    .personalization-section p:last-child {
+      margin-bottom: 0;
+    }
+
+    .footer {
+      padding: 32px;
+      font-size: 12px;
+      line-height: 1.8;
+      color: #777777;
+      border-top: 1px solid #ededed;
+      background: #fbfbfb;
+    }
+
+    .footer p {
+      margin: 0 0 16px;
+    }
+
+    .footer p:last-child {
+      margin-bottom: 0;
+    }
+
+    .footer a {
+      color: #1a1a1a;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    .highlight {
+      background-color: #FFE0E6;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
   </style>
 </head>
 
@@ -36,11 +157,29 @@
       </div>
 
       <div class="content">
-        <h1>🏁 Term End</h1>
+        <h1>🏁 End of Term</h1>
 
-        <p><p>Thanks for an amazing term! Our recreational programs wrap up on Thu 24 Sep, and our competitive programs continue through Thu 1 Oct.</p>
-<p>The next term resumes on Mon 12 Oct.</p>
-<p>See you soon!</p></p>
+        <p>Just a quick reminder as we come to the end of an amazing Term 3.</p>
+
+        <!-- ============================================================
+             SCENARIO 1: All programs end on same date
+             Use when: rec_end_date == comp_end_date
+             ============================================================ -->
+        [IF_SAME_DATE]
+        <p>All programs will finish up for the term on <span class="highlight">Thu 24 Sep</span>. The gym will then close for a well-deserved break from <span class="highlight">Mon 5–Fri 9 Oct</span>.</p>
+        <p>We'll be back for <span class="highlight">Next Term</span> starting <span class="highlight">Mon 12 Oct</span>.</p>
+        [/IF_SAME_DATE]
+
+        <!-- ============================================================
+             SCENARIO 2: Programs end on different dates
+             Use when: rec_end_date != comp_end_date
+             ============================================================ -->
+        [IF_DIFFERENT_DATES]
+        <p>Our recreational programs will finish up on <span class="highlight">Thu 24 Sep</span>, with all other programs finishing on <span class="highlight">Thu 1 Oct</span>. The gym will then close for a well-deserved break from <span class="highlight">Mon 5–Fri 9 Oct</span>.</p>
+        <p>We'll be back for <span class="highlight">Next Term</span> starting <span class="highlight">Mon 12 Oct</span>.</p>
+        [/IF_DIFFERENT_DATES]
+
+        <p class="closing-text">If you have any questions, please don't hesitate to reply. We're always here to help!</p>
 
         <p class="closing-text">Warm regards,<br>The SCA Allstars Team 🩵</p>
       </div>
