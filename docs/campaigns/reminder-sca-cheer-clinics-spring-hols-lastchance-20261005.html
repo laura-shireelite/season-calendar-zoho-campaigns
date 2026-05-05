@@ -45,16 +45,18 @@
       </div>
       <div class="quick-reminder-section">
         <p class="quick-reminder-title">Quick reminder</p>
-        <p class="quick-reminder-text">Your go-to for everything this season → <a style="color:#e91e63; text-decoration:none; font-weight:700;" href="https://www.scaallstars.com.au">scaallstars.com.au</a></p>
+        <p class="quick-reminder-text">Your go-to for everything this season → <a style="color:#e91e63; text-decoration:none; font-weight:700;" href="https://www.scaallstars.com.au/athletes">scaallstars.com.au/athletes</a></p>
       </div>
       <div class="personalization-section">
         <p><strong>Athlete's Name:</strong> $[UD:FIRST_NAME||]$</p>
-        <p><strong>Your Team(s)/Class(es):</strong> $[UD:AR_-_ENROLLED_TEAM(S)||]$, $[UD:AR_-_ENROLLED_CLASS(ES)||]$</p>
+        <p><strong>Your Team(s)/Class(es):</strong></p>
+        <p>$[UD:AR_-_ENROLLED_TEAM(S)||]$</p>
+        <p>$[UD:AR_-_ENROLLED_CLASS(ES)||]$</p>
       </div>
       <div class="footer">
         <p><a href="https://www.scaallstars.com.au">www.scaallstars.com.au</a><br><a href="mailto:hello@scaallstars.com.au">hello@scaallstars.com.au</a></p>
         <p>You're receiving this email as part of your SCA Allstars enrolment.</p>
-        <p><a href="#">Unsubscribe</a> | <a href="#">Manage Preferences</a></p>
+        <p><a href="$[LI:UNSUBSCRIBE]$">Unsubscribe</a> | <a href="$[LI:SUB_PREF]$">Manage Preferences</a></p>
       </div>
     </div>
   </div>
