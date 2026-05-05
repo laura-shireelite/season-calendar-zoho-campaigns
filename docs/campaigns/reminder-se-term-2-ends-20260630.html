@@ -181,7 +181,9 @@
 
       <div class="personalization-section">
         <p><strong>Athlete's Name:</strong> $[UD:FIRST_NAME||]$</p>
-        <p><strong>Your Team(s)/Class(es):</strong> $[UD:AR_-_ENROLLED_TEAM(S)||]$, $[UD:AR_-_ENROLLED_CLASS(ES)||]$</p>
+        <p><strong>Your Team(s)/Class(es):</strong></p>
+        <p>$[UD:AR_-_ENROLLED_TEAM(S)||]$</p>
+        <p>$[UD:AR_-_ENROLLED_CLASS(ES)||]$</p>
       </div>
 
       <div class="footer">
@@ -191,7 +193,7 @@
         </p>
         <p>You're receiving this email as part of your Shire Elite enrolment.</p>
         <p>
-          <a href="#">Unsubscribe</a> | <a href="#">Manage Preferences</a>
+          <a href="$[LI:UNSUBSCRIBE]$">Unsubscribe</a> | <a href="$[LI:SUB_PREF]$">Manage Preferences</a>
         </p>
       </div>
 
