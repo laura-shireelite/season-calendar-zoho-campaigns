@@ -138,13 +138,13 @@
     <div class="email-container">
 
       <div class="header">
-        <!-- Shire Elite Logo/Brand -->
+        <!-- Shire Elite logo, hosted in Zoho (from the hand-built emails, 16-10-2026) --><img src="https://stratus.campaign-image.com.au/images/17900413739021_secampaignslogozcv1491300_zc_v1_1_4913000013253004.png" alt="Shire Elite" width="200" style="display:block;margin:0;width:200px;max-width:60%;height:auto;border:0;">
       </div>
 
       <div class="content">
         <h1>⚠️ Gym Closure Notice</h1>
 
-        <p>Just a quick reminder that the gym will be closed this Fri 3–Mon 6 Apr due to Easter. A catch-up session for all teams, classes and private lessons will take place on Sat 9 May. All classes will run at their usual times.</p>
+        <p>Just a quick reminder that the gym will be closed this Fri 3–Mon 6 Apr due to Easter. A catch-up session for all teams, classes and private lessons will take place on Sat 9 May. Classes will run in their usual order, from 9am-1:30pm.</p>
 
         <p class="closing-text">If you have any questions at all, please don't hesitate to reply, we're always here to help!</p>
 
@@ -157,10 +157,8 @@
       </div>
 
       <div class="personalization-section">
-        <p><strong>Athlete's Name:</strong> $[UD:FIRST_NAME||]$<br>
-<strong>Your Team(s)/Class(es):</strong><br>
-$[UD:AR_-_ENROLLED_TEAM(S)||]$<br>
-$[UD:AR_-_ENROLLED_CLASS(ES)||]$</p>
+        <p style="margin:0 0 4px; text-align:left;"><strong>Your athletes:</strong></p>
+        <div style="white-space:pre-line; text-align:left;">$[UD:FAMILY_ATHLETES||]$</div>
       </div>
 
       <div class="footer">
