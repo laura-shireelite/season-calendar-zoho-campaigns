@@ -138,7 +138,7 @@
     <div class="email-container">
 
       <div class="header">
-        <!-- Shire Elite Logo/Brand -->
+        <!-- Shire Elite logo, hosted in Zoho (from the hand-built emails, 16-10-2026) --><img src="https://stratus.campaign-image.com.au/images/17900413739021_secampaignslogozcv1491300_zc_v1_1_4913000013253004.png" alt="Shire Elite" width="200" style="display:block;margin:0;width:200px;max-width:60%;height:auto;border:0;">
       </div>
 
       <div class="content">
@@ -159,10 +159,8 @@
       </div>
 
       <div class="personalization-section">
-        <p><strong>Athlete's Name:</strong> $[UD:FIRST_NAME||]$<br>
-<strong>Your Team(s)/Class(es):</strong><br>
-$[UD:AR_-_ENROLLED_TEAM(S)||]$<br>
-$[UD:AR_-_ENROLLED_CLASS(ES)||]$</p>
+        <p style="margin:0 0 4px; text-align:left;"><strong>Your athletes:</strong></p>
+        <div style="white-space:pre-line; text-align:left;">$[UD:FAMILY_ATHLETES||]$</div>
       </div>
 
       <div class="footer">
