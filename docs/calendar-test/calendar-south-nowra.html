@@ -1,0 +1,50 @@
+<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>Add the SE South Nowra calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#1A2433;--dark:#1A1A1A;--grey:#4D4D4D;--yellow:#FDE021;--blue:#3CAACB;--card:#F2F4F7;--pill:#C9EAF3}
+*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--dark);font-family:Poppins,system-ui,sans-serif;font-size:16px;line-height:1.5}
+.mock{background:#EDEDED;color:var(--grey);font-size:12px;text-align:center;padding:4px 16px}
+.wrap{max-width:480px;margin:0 auto;padding:20px 16px 40px}
+.logo{display:block;width:150px;margin:4px auto 18px}
+.hero{background:var(--yellow);border-radius:14px;padding:18px 18px 16px}
+.pill{display:inline-block;background:var(--navy);color:#fff;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:3px 10px;border-radius:999px}
+h1{font-family:Montserrat,sans-serif;font-size:24px;line-height:1.2;color:var(--navy);margin:10px 0 6px}
+.hero p{margin:0;font-size:15px}
+.btn{display:block;text-align:center;text-decoration:none;font-weight:600;font-size:17px;padding:15px 16px;border-radius:12px;margin-top:12px;background:var(--navy);color:#fff}
+.btn.alt{background:#fff;color:var(--navy);border:2px solid var(--navy);font-size:15px;padding:12px 16px}
+.btns{margin:18px 0 6px}
+.tip{font-size:14px;color:var(--grey);margin:10px 2px 0}
+.card{background:var(--card);border-radius:14px;padding:14px 16px;margin-top:22px;font-size:14px}
+.card b{display:block;font-size:15px;color:var(--navy);margin-bottom:2px}
+.links{margin-top:22px;border-top:1px solid #EDEDED;padding-top:10px}
+.links a,.links button{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid #EDEDED;padding:13px 2px;font:inherit;font-size:15px;color:var(--navy);text-decoration:none;cursor:pointer}
+.links a::after,.links button::after{content:"›";float:right;color:var(--blue);font-size:20px;line-height:1}
+.copied{color:var(--blue);font-size:13px;min-height:18px;margin-top:4px}
+</style></head><body>
+<div class="mock">Mock-up for testing. The real page will live at shireelite.com.au/calendar/south-nowra</div>
+<div class="wrap">
+<img class="logo" src="se-logo.png" alt="Shire Elite">
+<div class="hero"><span class="pill">SE South Nowra</span>
+<h1>Add our calendar to your phone</h1>
+<p>Every term date, closure, catch-up, clinic and comp, right in your phone's calendar. If a date changes, your phone updates by itself.</p></div>
+<div class="btns" id="btns"></div>
+<p class="tip" id="tip"></p>
+<div class="card"><b>Added our calendar before 2027?</b>If you used the old Apple Calendar button, you have a copy that won't update. Add it again here to get live updates.</div>
+<div class="links">
+<a href="#" onclick="alert('Mock-up: the PDF link goes here once the family calendars are published.');return false">Download the South Nowra calendar (PDF)</a>
+<button type="button" id="copy">Using Outlook or another calendar? Copy the link</button>
+<a href="calendar-miranda.html">Looking for SE Miranda?</a>
+</div>
+<p class="copied" id="copied"></p>
+</div>
+<script>
+var D={"apple": "webcal://calendar.google.com/calendar/ical/c_260208861ba58a2357de85d089e265374e7f19d8564185ed7652838ce45b89cf%40group.calendar.google.com/public/basic.ics", "google": "https://calendar.google.com/calendar?cid=Y18yNjAyMDg4NjFiYTU4YTIzNTdkZTg1ZDA4OWUyNjUzNzRlN2YxOWQ4NTY0MTg1ZWQ3NjUyODM4Y2U0NWI4OWNmQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20", "ics": "https://calendar.google.com/calendar/ical/c_260208861ba58a2357de85d089e265374e7f19d8564185ed7652838ce45b89cf%40group.calendar.google.com/public/basic.ics"};
+var ua=navigator.userAgent,dev=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)?'iphone':/Android/.test(ua)?'android':'computer';
+var A='<a class="btn{c}" href="'+D.apple+'">Add to iPhone / Apple Calendar</a>',G='<a class="btn{c}" href="'+D.google+'">Add to Google Calendar</a>';
+function b(s,alt){return s.replace('{c}',alt?' alt':'')}
+document.getElementById('btns').innerHTML=dev==='android'?b(G)+b(A,1):b(A)+b(G,1);
+document.getElementById('tip').innerHTML=dev==='android'?'On the next screen, tap <b>Add</b>.':dev==='iphone'?'On the next screen, tap <b>Find</b>, then the tick. Want it on your iPad or Mac too? Set Account to <b>iCloud</b> first.':'Tap the button for the calendar you use.';
+document.getElementById('copy').onclick=function(){try{navigator.clipboard.writeText(D.ics).then(function(){document.getElementById('copied').textContent='Link copied. Add it as a subscribed calendar in your app.'})}catch(e){prompt('Copy this link',D.ics)}};
+</script></body></html>
