@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Add to your calendar</title><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:16px;background:#fff;color:#1a1a1a;max-width:560px}
+h1{font-size:20px}h2{font-size:16px;margin-top:22px}.l{display:block;padding:12px 14px;margin:8px 0;border:1px solid #ccc;border-radius:10px;text-decoration:none;color:#1a1a1a}
+.l b{display:inline-block;width:22px}.n{font-size:14px;color:#555;line-height:1.45}.dev{background:#FDE021;padding:8px 12px;border-radius:8px;font-weight:600}
+.btn{display:block;text-align:center;padding:14px;margin:10px 0;border-radius:10px;background:#1a1a1a;color:#fff;text-decoration:none;font-weight:600}.btn.alt{background:#fff;color:#1a1a1a;border:1px solid #1a1a1a}
+.qr svg{width:260px;height:260px}</style><script>var ua=navigator.userAgent;var dev=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)?'iphone':/Android/.test(ua)?'android':'computer';</script></head><body>
+<h1>Add the SE calendar to your phone</h1>
+<p class="n">Prototype for testing. Pick your location, then tap the button. Any date change we make shows up on your phone by itself.</p>
+<p><label><input type="radio" name="loc" value="Miranda" checked> Miranda</label> &nbsp; <label><input type="radio" name="loc" value="South Nowra"> South Nowra</label></p>
+<div id="btns"></div>
+<p class="n" id="other"></p>
+<script>var D={"Miranda": {"apple": "https://laura-shireelite.github.io/season-calendar-zoho-campaigns/calendar-test/go-apple.html", "google": "https://calendar.google.com/calendar?cid=Y19hNGI3ZjAzN2NlY2VkM2EyYmQ4ZDQwZGNjOWRjYzllZGQyOGRjNTM0YzUyNjdjZDIxMzU4ZmQ3NGI2YTJkZjhhQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20", "ics": "https://calendar.google.com/calendar/ical/c_a4b7f037ceced3a2bd8d40dcc9dcc9edd28dc534c5267cd21358fd74b6a2df8a%40group.calendar.google.com/public/basic.ics"}, "South Nowra": {"apple": "webcal://calendar.google.com/calendar/ical/c_260208861ba58a2357de85d089e265374e7f19d8564185ed7652838ce45b89cf%40group.calendar.google.com/public/basic.ics", "google": "https://calendar.google.com/calendar?cid=Y18yNjAyMDg4NjFiYTU4YTIzNTdkZTg1ZDA4OWUyNjUzNzRlN2YxOWQ4NTY0MTg1ZWQ3NjUyODM4Y2U0NWI4OWNmQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20", "ics": "https://calendar.google.com/calendar/ical/c_260208861ba58a2357de85d089e265374e7f19d8564185ed7652838ce45b89cf%40group.calendar.google.com/public/basic.ics"}};
+function draw(){var loc=document.querySelector('input[name=loc]:checked').value,d=D[loc];
+var a='<a class="btn" href="'+d.apple+'">Add to iPhone / Apple Calendar</a>',g='<a class="btn" href="'+d.google+'">Add to Google Calendar</a>';
+var first=dev==='android'?g+a.replace('class="btn"','class="btn alt"'):a+g.replace('class="btn"','class="btn alt"');
+document.getElementById('btns').innerHTML=first;
+document.getElementById('other').innerHTML='Using Outlook or something else? Copy this link and add it as a subscribed calendar:<br><small>'+d.ics+'</small>';}
+document.querySelectorAll('input[name=loc]').forEach(function(r){r.onchange=draw});draw();</script>
+</body></html>
