@@ -34,17 +34,17 @@ h1{font-family:Montserrat,sans-serif;font-size:24px;line-height:1.2;color:var(--
 <div class="card"><b>Added our calendar before 2027?</b>If you used the old Apple Calendar button, you have a copy that won't update. Add it again here to get live updates.</div>
 <div class="links">
 <a href="#" onclick="alert('Mock-up: the PDF link goes here once the family calendars are published.');return false">Download the Miranda calendar (PDF)</a>
-<button type="button" id="copy">Using Outlook or another calendar? Copy the link</button>
+<button type="button" id="copy">Using another calendar app? Copy the link</button>
 <a href="calendar-south-nowra.html">Looking for SE South Nowra?</a>
 </div>
 <p class="copied" id="copied"></p>
 </div>
 <script>
-var D={"apple": "webcal://calendar.google.com/calendar/ical/c_a4b7f037ceced3a2bd8d40dcc9dcc9edd28dc534c5267cd21358fd74b6a2df8a%40group.calendar.google.com/public/basic.ics", "google": "https://calendar.google.com/calendar?cid=Y19hNGI3ZjAzN2NlY2VkM2EyYmQ4ZDQwZGNjOWRjYzllZGQyOGRjNTM0YzUyNjdjZDIxMzU4ZmQ3NGI2YTJkZjhhQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20", "ics": "https://calendar.google.com/calendar/ical/c_a4b7f037ceced3a2bd8d40dcc9dcc9edd28dc534c5267cd21358fd74b6a2df8a%40group.calendar.google.com/public/basic.ics"};
+var D={"apple": "webcal://calendar.google.com/calendar/ical/c_a4b7f037ceced3a2bd8d40dcc9dcc9edd28dc534c5267cd21358fd74b6a2df8a%40group.calendar.google.com/public/basic.ics", "google": "https://calendar.google.com/calendar?cid=Y19hNGI3ZjAzN2NlY2VkM2EyYmQ4ZDQwZGNjOWRjYzllZGQyOGRjNTM0YzUyNjdjZDIxMzU4ZmQ3NGI2YTJkZjhhQGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20", "ics": "https://calendar.google.com/calendar/ical/c_a4b7f037ceced3a2bd8d40dcc9dcc9edd28dc534c5267cd21358fd74b6a2df8a%40group.calendar.google.com/public/basic.ics", "outlook": "https://outlook.live.com/calendar/0/addfromweb?url=https%3A%2F%2Fcalendar.google.com%2Fcalendar%2Fical%2Fc_a4b7f037ceced3a2bd8d40dcc9dcc9edd28dc534c5267cd21358fd74b6a2df8a%2540group.calendar.google.com%2Fpublic%2Fbasic.ics&name=Shire%20Elite%20-%20Miranda"};
 var ua=navigator.userAgent,dev=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1)?'iphone':/Android/.test(ua)?'android':'computer';
-var A='<a class="btn{c}" href="'+D.apple+'">Add to iPhone / Apple Calendar</a>',G='<a class="btn{c}" href="'+D.google+'">Add to Google Calendar</a>';
+var A='<a class="btn{c}" href="'+D.apple+'">Add to iPhone / Apple Calendar</a>',G='<a class="btn{c}" href="'+D.google+'">Add to Google Calendar</a>',O='<a class="btn alt" href="'+D.outlook+'">Add to Outlook</a>';
 function b(s,alt){return s.replace('{c}',alt?' alt':'')}
-document.getElementById('btns').innerHTML=dev==='android'?b(G)+b(A,1):b(A)+b(G,1);
+document.getElementById('btns').innerHTML=dev==='android'?b(G)+b(A,1)+O:b(A)+b(G,1)+O;
 document.getElementById('tip').innerHTML=dev==='android'?'On the next screen, tap <b>Add</b>.':dev==='iphone'?'On the next screen, tap <b>Find</b>, then the tick. Want it on your iPad or Mac too? Set Account to <b>iCloud</b> first.':'Tap the button for the calendar you use.';
 document.getElementById('copy').onclick=function(){try{navigator.clipboard.writeText(D.ics).then(function(){document.getElementById('copied').textContent='Link copied. Add it as a subscribed calendar in your app.'})}catch(e){prompt('Copy this link',D.ics)}};
 </script></body></html>
